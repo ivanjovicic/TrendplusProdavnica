@@ -1,6 +1,7 @@
-﻿namespace TrendplusProdavnica.Application;
-
-public class Class1
+namespace TrendplusProdavnica.Application
 {
-
+    // Application layer entry placeholder
+    public class Class1
+    {
+    }
 }
