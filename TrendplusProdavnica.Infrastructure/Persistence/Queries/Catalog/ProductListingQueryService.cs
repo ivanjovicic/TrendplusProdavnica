@@ -187,7 +187,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
             if (query.Sizes?.Length > 0)
             {
-                products = products.Where(p => p.Variants.Any(v => v.IsActive && v.IsVisible && query.Sizes.Contains((long)v.SizeEu)));
+                var requestedSizes = query.Sizes.Select(size => (decimal)size).ToArray();
+                products = products.Where(p => p.Variants.Any(v => v.IsActive && v.IsVisible && requestedSizes.Contains(v.SizeEu)));
             }
 
             if (query.Colors?.Length > 0)
@@ -276,7 +277,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
             var facets = new List<FilterFacetDto>
             {
-                new FilterFacetDto("sizes", "Veličine", "multi", sizeOptions),
+                new FilterFacetDto("sizes", "Velicine", "multi", sizeOptions),
                 new FilterFacetDto("colors", "Boje", "multi", colorOptions),
                 new FilterFacetDto("brands", "Brendovi", "multi", brandOptions),
                 new FilterFacetDto("price", "Cena", "range", priceOptions),
@@ -312,7 +313,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
             if (query.Sizes?.Length > 0)
             {
-                applied.AddRange(query.Sizes.Select(size => new AppliedFilterDto("size", "Veličina", size.ToString(), size.ToString())));
+                applied.AddRange(query.Sizes.Select(size => new AppliedFilterDto("size", "Velicina", size.ToString(), size.ToString())));
             }
 
             if (query.Colors?.Length > 0)
@@ -327,7 +328,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
             if (query.PriceFrom.HasValue || query.PriceTo.HasValue)
             {
-                var display = $"{query.PriceFrom?.ToString() ?? "0"} - {query.PriceTo?.ToString() ?? "∞"}";
+                var display = $"{query.PriceFrom?.ToString() ?? "0"} - {query.PriceTo?.ToString() ?? "max"}";
                 applied.Add(new AppliedFilterDto("price", "Cena", display, display));
             }
 
@@ -399,3 +400,4 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
         }
     }
 }
+

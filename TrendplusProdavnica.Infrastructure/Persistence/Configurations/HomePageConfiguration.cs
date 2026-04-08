@@ -20,7 +20,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
 
             // Modules is a JSON payload
             builder.Property(x => x.Modules)
-                .HasConversion(new JsonValueConverter<IEnumerable<HomeModule>>())
+                .HasConversion(JsonValueConverter<IEnumerable<HomeModule>>.NonNullable())
                 .HasColumnType("jsonb");
 
             // Partial unique index for single published homepage - created in migration

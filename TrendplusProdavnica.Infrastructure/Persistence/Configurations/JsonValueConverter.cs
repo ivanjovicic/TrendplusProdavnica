@@ -9,18 +9,45 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
         where T : class
     {
         public JsonValueConverter() : base(
-            v => string.IsNullOrEmpty(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null)) ? string.Empty : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-            v => string.IsNullOrEmpty(v) ? default : Deserialize(v)
+            v => Serialize(v),
+            v => Deserialize(v)
         ) { }
+
+        public static ValueConverter<T, string> NonNullable()
+        {
+            return new ValueConverter<T, string>(
+                v => Serialize(v),
+                v => DeserializeNonNullable(v));
+        }
+
+        private static string Serialize(T? value)
+        {
+            if (value is null)
+            {
+                return string.Empty;
+            }
+
+            return JsonSerializer.Serialize(value, (JsonSerializerOptions?)null);
+        }
 
         private static T? Deserialize(string value)
         {
-            if (string.IsNullOrEmpty(value))
+            if (string.IsNullOrWhiteSpace(value))
             {
                 return default;
             }
 
-            var deserialized = JsonSerializer.Deserialize<T>(value, (JsonSerializerOptions?)null);
+            return JsonSerializer.Deserialize<T>(value, (JsonSerializerOptions?)null);
+        }
+
+        private static T DeserializeNonNullable(string value)
+        {
+            var deserialized = Deserialize(value);
+            if (deserialized is null)
+            {
+                throw new InvalidOperationException("Deserialization returned null for non-nullable value.");
+            }
+
             return deserialized;
         }
     }

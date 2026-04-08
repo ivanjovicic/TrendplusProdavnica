@@ -36,21 +36,28 @@ var summaries = new[]
 app.MapGet("/catalog/category/{slug}", async (
     string slug,
     IProductListingQueryService listingService,
-    int page,
-    int pageSize,
-    string? sort,
-    long[]? sizes,
-    string[]? colors,
-    long[]? brands,
-    decimal? priceFrom,
-    decimal? priceTo,
-    bool? isOnSale,
-    bool? isNew,
-    bool? inStockOnly) =>
+    int page = 1,
+    int pageSize = 24,
+    string? sort = null,
+    long[]? sizes = null,
+    string[]? colors = null,
+    long[]? brands = null,
+    decimal? priceFrom = null,
+    decimal? priceTo = null,
+    bool? isOnSale = null,
+    bool? isNew = null,
+    bool? inStockOnly = null) =>
 {
-    var query = new GetCategoryListingQuery(slug, page, pageSize, sort, sizes, colors, brands, priceFrom, priceTo, isOnSale, isNew, inStockOnly);
-    var result = await listingService.GetCategoryListingAsync(query);
-    return Results.Ok(result);
+    try
+    {
+        var query = new GetCategoryListingQuery(slug, page, pageSize, sort, sizes, colors, brands, priceFrom, priceTo, isOnSale, isNew, inStockOnly);
+        var result = await listingService.GetCategoryListingAsync(query);
+        return Results.Ok(result);
+    }
+    catch (System.Collections.Generic.KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { message = ex.Message });
+    }
 })
 .WithName("GetCategoryListing");
 
