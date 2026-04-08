@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,22 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
         private readonly TrendplusDbContext _db;
         public EditorialQueryService(TrendplusDbContext db) => _db = db;
 
+        public async Task<IReadOnlyList<EditorialArticleCardDto>> GetListAsync()
+        {
+            return await _db.EditorialArticles.AsNoTracking()
+                .Where(a => a.Status == Domain.Enums.ContentStatus.Published)
+                .OrderByDescending(a => a.PublishedAtUtc)
+                .Select(a => new EditorialArticleCardDto(
+                    a.Title,
+                    a.Slug,
+                    a.Excerpt,
+                    a.CoverImageUrl ?? string.Empty,
+                    a.PublishedAtUtc.HasValue ? a.PublishedAtUtc.Value.UtcDateTime : DateTime.UtcNow,
+                    a.Topic ?? string.Empty
+                ))
+                .ToListAsync();
+        }
+
         public async Task<EditorialArticleDto> GetEditorialArticleAsync(GetEditorialArticleQuery query)
         {
             var art = await _db.EditorialArticles.AsNoTracking()
@@ -25,7 +42,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                     a.Excerpt,
                     a.CoverImageUrl ?? string.Empty,
                     a.Body,
-                    a.PublishedAtUtc.HasValue ? a.PublishedAtUtc.Value.UtcDateTime : DateTime.UtcNow,
+                    a.PublishedAtUtc.HasValue ? new DateTime(a.PublishedAtUtc.Value.Ticks, DateTimeKind.Utc) : DateTime.UtcNow,
                     a.Topic ?? string.Empty,
                     a.AuthorName ?? string.Empty,
                     new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(

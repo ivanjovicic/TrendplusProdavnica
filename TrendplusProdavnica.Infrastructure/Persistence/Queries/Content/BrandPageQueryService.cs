@@ -67,7 +67,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 .ToArrayAsync();
 
             var categoryLinks = categoryEntities
-                .Select(c => (object)new { Label = c.Name, Url = $"/kategorija/{c.Slug}" })
+                .Select(c => new BreadcrumbItemDto(c.Name, $"/kategorija/{c.Slug}"))
                 .ToArray();
 
             var seo = new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(
@@ -77,7 +77,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 null);
 
             var introText = pageContent?.IntroText ?? string.Empty;
-            object? faq = pageContent?.Faq?.Cast<object>().ToArray();
+            var faq = pageContent?.Faq?.Select(f => new FaqItemDto(f.Question ?? string.Empty, f.Answer ?? string.Empty)).ToArray();
 
             return new BrandPageDto(brand.Name, brand.Slug, introText, seo, featuredProducts, categoryLinks, faq);
         }

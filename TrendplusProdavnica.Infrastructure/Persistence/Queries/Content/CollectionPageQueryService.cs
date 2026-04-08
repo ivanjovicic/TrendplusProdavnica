@@ -59,8 +59,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 .Take(12)
                 .ToArrayAsync();
 
-            var merchBlocks = pageContent?.MerchBlocks?.Select(mb => (object)new { mb.Title, mb.Html, mb.ProductSlugs }).ToArray() ?? Array.Empty<object>();
-            object? faq = pageContent?.Faq?.Cast<object>().ToArray();
+            var merchBlocks = pageContent?.MerchBlocks?.Select(mb => new MerchBlockDto(mb.Title ?? string.Empty, mb.Html ?? string.Empty, (mb.ProductSlugs ?? Array.Empty<string>()).ToArray())).ToArray() ?? Array.Empty<MerchBlockDto>();
+            var faq = pageContent?.Faq?.Select(f => new FaqItemDto(f.Question ?? string.Empty, f.Answer ?? string.Empty)).ToArray();
 
             var seo = new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(
                 pageContent?.Seo?.SeoTitle ?? col.Name,

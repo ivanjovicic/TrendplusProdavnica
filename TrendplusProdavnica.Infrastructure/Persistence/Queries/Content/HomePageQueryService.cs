@@ -61,16 +61,21 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 .Where(c => c.IsFeatured && c.IsActive)
                 .Select(c => c.Id);
 
-            var featuredCollections = await GetProductCardsAsync(
-                liveProducts
-                    .Where(p => p.CollectionMaps.Any(cm => featuredCollectionIds.Contains(cm.CollectionId)))
-                    .OrderByDescending(p => p.SortRank),
-                12);
+            var featuredCollections = await _db.Collections.AsNoTracking()
+                .Where(c => c.IsFeatured && c.IsActive)
+                .OrderBy(c => c.SortOrder)
+                .Select(c => new CollectionTeaserDto(
+                    c.Name,
+                    c.Slug,
+                    c.CoverImageUrl,
+                    c.ShortDescription))
+                .Take(6)
+                .ToArrayAsync();
 
             var brandWall = await _db.Brands.AsNoTracking()
                 .Where(b => b.IsActive && b.IsFeatured)
                 .OrderBy(b => b.SortOrder)
-                .Select(b => b.Slug)
+                .Select(b => new BrandWallItemDto(b.Name, b.Slug, b.LogoUrl))
                 .ToArrayAsync();
 
             var storeTeaser = await _db.Stores.AsNoTracking()
@@ -79,22 +84,22 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 .Select(s => new StoreTeaserDto(s.Name, s.Slug, s.CoverImageUrl ?? string.Empty))
                 .FirstOrDefaultAsync();
 
-            ProductCardDto[] categoryCards = Array.Empty<ProductCardDto>();
+            CategoryCardDto[] categoryCards = Array.Empty<CategoryCardDto>();
             try
             {
-                var productSlugs = ExtractModuleProductSlugs(page.Modules);
-                if (productSlugs.Length > 0)
+                var categoryIds = ExtractModuleCategoryIds(page.Modules);
+                if (categoryIds.Length > 0)
                 {
-                    categoryCards = await GetProductCardsAsync(
-                        liveProducts
-                            .Where(p => productSlugs.Contains(p.Slug))
-                            .OrderBy(p => p.Name),
-                        productSlugs.Length);
+                    categoryCards = await _db.Categories.AsNoTracking()
+                        .Where(c => categoryIds.Contains(c.Id))
+                        .OrderBy(c => c.Name)
+                        .Select(c => new CategoryCardDto(c.Name, c.Slug, c.ImageUrl))
+                        .ToArrayAsync();
                 }
             }
             catch
             {
-                categoryCards = Array.Empty<ProductCardDto>();
+                categoryCards = Array.Empty<CategoryCardDto>();
             }
 
             return new HomePageDto(
@@ -157,9 +162,9 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 projection.ColorLabel);
         }
 
-        private static string[] ExtractModuleProductSlugs(IEnumerable<HomeModule> modules)
+        private static long[] ExtractModuleCategoryIds(IEnumerable<HomeModule> modules)
         {
-            var slugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var ids = new HashSet<long>();
 
             foreach (var module in modules)
             {
@@ -168,36 +173,32 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                     continue;
                 }
 
-                if (!payload.TryGetProperty("productSlugs", out var productSlugs) || productSlugs.ValueKind != JsonValueKind.Array)
+                if (!payload.TryGetProperty("categoryIds", out var categoryIds) || categoryIds.ValueKind != JsonValueKind.Array)
                 {
                     continue;
                 }
 
-                foreach (var item in productSlugs.EnumerateArray())
+                foreach (var item in categoryIds.EnumerateArray())
                 {
-                    if (item.ValueKind == JsonValueKind.String)
+                    if (item.ValueKind == JsonValueKind.Number && item.TryGetInt64(out var id))
                     {
-                        var slug = item.GetString();
-                        if (!string.IsNullOrWhiteSpace(slug))
-                        {
-                            slugs.Add(slug);
-                        }
+                        ids.Add(id);
                     }
                 }
             }
 
-            return slugs.ToArray();
+            return ids.ToArray();
         }
 
         private static HomePageDto EmptyHomePage() => new HomePageDto(
             new SeoDto(string.Empty, string.Empty, null, null),
             null,
             new HeroSectionDto(string.Empty, string.Empty, string.Empty),
+            Array.Empty<CategoryCardDto>(),
             Array.Empty<ProductCardDto>(),
+            Array.Empty<CollectionTeaserDto>(),
             Array.Empty<ProductCardDto>(),
-            Array.Empty<ProductCardDto>(),
-            Array.Empty<ProductCardDto>(),
-            Array.Empty<string>(),
+            Array.Empty<BrandWallItemDto>(),
             null,
             null,
             Array.Empty<TrustItemDto>(),
