@@ -18,14 +18,17 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
         {
             var col = await _db.Collections.AsNoTracking()
                 .Where(c => c.Slug == query.Slug)
-                .Select(c => new { c.Name, c.Slug, c.Seo })
+                .Select(c => new { c.Id, c.Name, c.Slug, c.Seo })
                 .FirstOrDefaultAsync();
 
             if (col is null) throw new System.Collections.Generic.KeyNotFoundException("Collection not found");
 
-            var featured = await _db.ProductCollectionMaps.AsNoTracking()
-                .Where(m => m.Collection.Slug == query.Slug)
-                .Select(m => m.Product)
+            var featured = await _db.Products.AsNoTracking()
+                .Where(p =>
+                    p.CollectionMaps.Any(cm => cm.CollectionId == col.Id) &&
+                    p.IsVisible &&
+                    p.IsPurchasable &&
+                    p.Status == Domain.Enums.ProductStatus.Published)
                 .OrderByDescending(p => p.IsBestseller)
                 .Take(12)
                 .Select(p => new TrendplusProdavnica.Application.Catalog.Dtos.ProductCardDto(

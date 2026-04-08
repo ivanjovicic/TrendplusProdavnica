@@ -20,6 +20,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 .Where(b => b.Slug == query.Slug)
                 .Select(b => new
                 {
+                    b.Id,
                     b.Name,
                     b.Slug,
                     b.Seo
@@ -29,7 +30,11 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
             if (brand is null) throw new System.Collections.Generic.KeyNotFoundException("Brand not found");
 
             var featured = await _db.Products.AsNoTracking()
-                .Where(p => p.BrandId == _db.Brands.Where(b => b.Slug == query.Slug).Select(b => b.Id).FirstOrDefault())
+                .Where(p =>
+                    p.BrandId == brand.Id &&
+                    p.IsVisible &&
+                    p.IsPurchasable &&
+                    p.Status == Domain.Enums.ProductStatus.Published)
                 .OrderByDescending(p => p.IsBestseller)
                 .Take(12)
                 .Select(p => new TrendplusProdavnica.Application.Catalog.Dtos.ProductCardDto(

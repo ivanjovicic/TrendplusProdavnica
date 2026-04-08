@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -24,14 +25,18 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                     a.Excerpt,
                     a.CoverImageUrl ?? string.Empty,
                     a.Body,
-                    a.PublishedAtUtc ?? System.DateTimeOffset.UtcNow,
+                    a.PublishedAtUtc.HasValue ? a.PublishedAtUtc.Value.UtcDateTime : DateTime.UtcNow,
                     a.Topic ?? string.Empty,
                     a.AuthorName ?? string.Empty,
-                    new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(a.Seo?.SeoTitle ?? a.Title, a.Seo?.SeoDescription ?? string.Empty, a.Seo?.CanonicalUrl, null),
+                    new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(
+                        a.Seo != null ? a.Seo.SeoTitle ?? a.Title : a.Title,
+                        a.Seo != null ? a.Seo.SeoDescription ?? string.Empty : string.Empty,
+                        a.Seo != null ? a.Seo.CanonicalUrl : null,
+                        null),
                     a.Products.Select(p => p.ProductId).ToArray(),
                     a.Collections.Select(c => c.CollectionId).ToArray(),
                     a.Categories.Select(c => c.CategoryId).ToArray(),
-                    new long[0]
+                    Array.Empty<long>()
                 ))
                 .FirstOrDefaultAsync();
 

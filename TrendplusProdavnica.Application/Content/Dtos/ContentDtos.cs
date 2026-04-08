@@ -16,10 +16,10 @@ namespace TrendplusProdavnica.Application.Content.Dtos
         string Topic,
         string AuthorName,
         TrendplusProdavnica.Application.Catalog.Dtos.SeoDto Seo,
-        object[] RelatedProducts,
-        object[] RelatedCollections,
-        object[] RelatedCategories,
-        object[] RelatedArticles
+        long[] RelatedProducts,
+        long[] RelatedCollections,
+        long[] RelatedCategories,
+        long[] RelatedArticles
     );
 
     public record BrandPageDto(

@@ -17,7 +17,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
         public async Task<ProductDetailDto> GetProductDetailAsync(GetProductDetailQuery query)
         {
             var dto = await _db.Products.AsNoTracking()
-                .Where(p => p.Slug == query.Slug && p.IsVisible && p.IsPurchasable)
+                .Where(p => p.Slug == query.Slug && p.IsVisible && p.IsPurchasable && p.Status == Domain.Enums.ProductStatus.Published)
                 .Select(p => new ProductDetailDto(
                     p.Id,
                     p.Slug,
@@ -43,7 +43,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                     )).ToArray(),
                     p.Variants.OrderBy(v => v.SortOrder).Select(v => new ProductSizeOptionDto(
                         v.Id,
-                        (int)v.SizeEu,
+                        v.SizeEu,
                         v.SizeEu.ToString(),
                         v.StockStatus != Domain.Enums.StockStatus.OutOfStock,
                         v.TotalStock <= v.LowStockThreshold,

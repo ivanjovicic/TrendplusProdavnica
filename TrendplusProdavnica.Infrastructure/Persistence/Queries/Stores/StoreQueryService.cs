@@ -55,7 +55,11 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Stores
                     x.WorkingHoursText ?? string.Empty,
                     x.ShortDescription ?? string.Empty,
                     x.CoverImageUrl ?? string.Empty,
-                    new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(x.Seo?.SeoTitle ?? x.Name, x.Seo?.SeoDescription ?? string.Empty, x.Seo?.CanonicalUrl, null),
+                    new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(
+                        x.Seo != null ? x.Seo.SeoTitle ?? x.Name : x.Name,
+                        x.Seo != null ? x.Seo.SeoDescription ?? string.Empty : string.Empty,
+                        x.Seo != null ? x.Seo.CanonicalUrl : null,
+                        null),
                     new object[0],
                     new object[0]
                 ))

@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -16,21 +17,27 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
         public async Task<ProductListingPageDto> GetCategoryListingAsync(GetCategoryListingQuery query)
         {
+            var page = query.Page < 1 ? 1 : query.Page;
+            var pageSize = query.PageSize <= 0 ? 24 : query.PageSize;
+            var isSaleSlug = string.Equals(query.Slug, "sale", StringComparison.OrdinalIgnoreCase);
+
             var q = _db.Products.AsNoTracking()
                 .Where(p => p.IsVisible && p.IsPurchasable && p.Status == Domain.Enums.ProductStatus.Published);
 
             // filter by category slug if provided
-            if (!string.IsNullOrWhiteSpace(query.Slug) && query.Slug != "sale")
+            if (!string.IsNullOrWhiteSpace(query.Slug) && !isSaleSlug)
             {
                 var categoryId = await _db.Categories.AsNoTracking().Where(c => c.Slug == query.Slug).Select(c => c.Id).FirstOrDefaultAsync();
-                if (categoryId > 0)
+                if (categoryId <= 0)
                 {
-                    q = q.Where(p => p.PrimaryCategoryId == categoryId || p.CategoryMaps.Any(cm => cm.CategoryId == categoryId));
+                    throw new System.Collections.Generic.KeyNotFoundException($"Category '{query.Slug}' not found.");
                 }
+
+                q = q.Where(p => p.PrimaryCategoryId == categoryId || p.CategoryMaps.Any(cm => cm.CategoryId == categoryId));
             }
 
             // sale special: products with variants where OldPrice > Price
-            if (!string.IsNullOrWhiteSpace(query.Slug) && query.Slug == "sale")
+            if (isSaleSlug)
             {
                 q = q.Where(p => p.Variants.Any(v => v.OldPrice != null && v.OldPrice > v.Price));
             }
@@ -46,8 +53,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             var items = await q
                 .OrderByDescending(p => p.IsNew)
                 .ThenByDescending(p => p.SortRank)
-                .Skip((query.Page - 1) * query.PageSize)
-                .Take(query.PageSize)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(p => new ProductCardDto(
                     p.Id,
                     p.Slug,
@@ -66,7 +73,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 ))
                 .ToArrayAsync();
 
-            var pagination = new PaginationDto(query.Page, query.PageSize, total);
+            var pagination = new PaginationDto(page, pageSize, total);
 
             return new ProductListingPageDto(
                 Title: "Proizvodi",
@@ -86,14 +93,20 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
         public async Task<ProductListingPageDto> GetBrandListingAsync(GetBrandListingQuery query)
         {
+            var page = query.Page < 1 ? 1 : query.Page;
+            var pageSize = query.PageSize <= 0 ? 24 : query.PageSize;
             var brandId = await _db.Brands.AsNoTracking().Where(b => b.Slug == query.Slug).Select(b => b.Id).FirstOrDefaultAsync();
-            var dtoQuery = new GetCategoryListingQuery(query.Slug, query.Page, query.PageSize);
+            if (brandId <= 0)
+            {
+                throw new System.Collections.Generic.KeyNotFoundException($"Brand '{query.Slug}' not found.");
+            }
+
             // reuse main method but apply brand filter
             var q = _db.Products.AsNoTracking().Where(p => p.BrandId == brandId && p.IsVisible && p.IsPurchasable && p.Status == Domain.Enums.ProductStatus.Published);
 
             var total = await q.LongCountAsync();
             var items = await q.OrderByDescending(p => p.IsNew).ThenByDescending(p => p.SortRank)
-                .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+                .Skip((page - 1) * pageSize).Take(pageSize)
                 .Select(p => new ProductCardDto(
                     p.Id,
                     p.Slug,
@@ -111,18 +124,25 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 ))
                 .ToArrayAsync();
 
-            var pagination = new PaginationDto(query.Page, query.PageSize, total);
+            var pagination = new PaginationDto(page, pageSize, total);
             return new ProductListingPageDto("Proizvodi", string.Empty, new SeoDto("Proizvodi", string.Empty, null, null), new BreadcrumbItemDto[0], null, null, items, new FilterFacetDto[0], new AppliedFilterDto[0], pagination, new object[0], null);
         }
 
         public async Task<ProductListingPageDto> GetCollectionListingAsync(GetCollectionListingQuery query)
         {
+            var page = query.Page < 1 ? 1 : query.Page;
+            var pageSize = query.PageSize <= 0 ? 24 : query.PageSize;
             var collectionId = await _db.Collections.AsNoTracking().Where(c => c.Slug == query.Slug).Select(c => c.Id).FirstOrDefaultAsync();
+            if (collectionId <= 0)
+            {
+                throw new System.Collections.Generic.KeyNotFoundException($"Collection '{query.Slug}' not found.");
+            }
+
             var q = _db.Products.AsNoTracking().Where(p => p.CollectionMaps.Any(cm => cm.CollectionId == collectionId) && p.IsVisible && p.IsPurchasable && p.Status == Domain.Enums.ProductStatus.Published);
 
             var total = await q.LongCountAsync();
             var items = await q.OrderByDescending(p => p.IsNew).ThenByDescending(p => p.SortRank)
-                .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+                .Skip((page - 1) * pageSize).Take(pageSize)
                 .Select(p => new ProductCardDto(
                     p.Id,
                     p.Slug,
@@ -140,7 +160,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 ))
                 .ToArrayAsync();
 
-            var pagination = new PaginationDto(query.Page, query.PageSize, total);
+            var pagination = new PaginationDto(page, pageSize, total);
             return new ProductListingPageDto("Proizvodi", string.Empty, new SeoDto("Proizvodi", string.Empty, null, null), new BreadcrumbItemDto[0], null, null, items, new FilterFacetDto[0], new AppliedFilterDto[0], pagination, new object[0], null);
         }
 
