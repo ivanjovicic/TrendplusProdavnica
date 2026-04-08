@@ -1,0 +1,88 @@
+# Visual Studio and .NET builds
+.vs/
+*.user
+*.suo
+*.userosscache
+*.userprefs
+
+# Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+out/
+
+# Publish output
+publish/
+*.Publish.xml
+
+# Rider
+.idea/
+*.sln.iml
+
+# VS Code - keep workspace settings but ignore local state
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# NuGet
+*.nupkg
+packages/
+.nuget/packages/
+
+# dotnet local DB / EF Core
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Test results
+TestResults/
+*.trx
+
+# Coverage
+coverage/
+coverage*.xml
+*.lcov
+
+# Node / frontend
+node_modules/
+wwwroot/node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Secrets and local configuration
+secrets.json
+.env
+.env.*
+appsettings.*.Local.json
+
+# ASP.NET Temporary files
+wwwroot/dist/
+
+# Ignore generated tool files
+*.dotCover
+*.ncrunch*
+*.resharper*
+_ReSharper*/
+*.DotSettings.user
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Aspire / local dev helper files
+.aspire/
+aspire-local-*.json
+aspire.*.local
+aspire.log
+
+# Avoid ignoring source files like apphost.cs or aspire.config.json — keep them in repo
+
+# Optional: uncomment if you want to ignore compiled binaries at repo root (use with caution)
+# *.exe
+# *.dll
+# *.pdb

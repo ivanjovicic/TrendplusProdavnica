@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="TrendplusProdavnica.Api/TrendplusProdavnica.Api.csproj" />
+  <Project Path="TrendplusProdavnica.AppHost/TrendplusProdavnica.AppHost.csproj" />
+  <Project Path="TrendplusProdavnica.Application/TrendplusProdavnica.Application.csproj" />
+  <Project Path="TrendplusProdavnica.Domain/TrendplusProdavnica.Domain.csproj" />
+  <Project Path="TrendplusProdavnica.Infrastructure/TrendplusProdavnica.Infrastructure.csproj" />
+  <Project Path="TrendplusProdavnica.ServiceDefaults/TrendplusProdavnica.ServiceDefaults.csproj" />
+  <Project Path="TrendplusProdavnica.Tests/TrendplusProdavnica.Tests.csproj" />
+</Solution>
