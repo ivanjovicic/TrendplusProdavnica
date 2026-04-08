@@ -1,11 +1,14 @@
 #nullable enable
+using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TrendplusProdavnica.Application.Catalog.Dtos;
 using TrendplusProdavnica.Application.Catalog.Services;
+using TrendplusProdavnica.Domain.Enums;
+using TrendplusProdavnica.Domain.ValueObjects;
 using TrendplusProdavnica.Infrastructure.Persistence;
 
 namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
@@ -24,7 +27,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 {
                     h.Seo,
                     h.Title,
-                    Modules = h.Modules
+                    h.Modules
                 })
                 .FirstOrDefaultAsync();
 
@@ -33,66 +36,60 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                 return EmptyHomePage();
             }
 
-            var seo = new SeoDto(page.Seo?.SeoTitle ?? page.Title, page.Seo?.SeoDescription ?? string.Empty, page.Seo?.CanonicalUrl, null);
+            var seo = new SeoDto(
+                page.Seo?.SeoTitle ?? page.Title,
+                page.Seo?.SeoDescription ?? string.Empty,
+                page.Seo?.CanonicalUrl,
+                null);
 
-            // New arrivals
-            var newArrivals = await _db.Products.AsNoTracking()
-                .Where(p => p.Status == Domain.Enums.ProductStatus.Published && p.IsVisible && p.IsPurchasable && p.IsNew)
-                .OrderByDescending(p => p.PublishedAtUtc)
-                .Take(12)
-                .Select(p => MapToProductCard(p))
-                .ToArrayAsync();
+            var liveProducts = _db.Products.AsNoTracking()
+                .Where(p => p.Status == ProductStatus.Published && p.IsVisible && p.IsPurchasable);
 
-            // Bestsellers
-            var bestsellers = await _db.Products.AsNoTracking()
-                .Where(p => p.Status == Domain.Enums.ProductStatus.Published && p.IsVisible && p.IsPurchasable && p.IsBestseller)
-                .OrderByDescending(p => p.SortRank)
-                .Take(12)
-                .Select(p => MapToProductCard(p))
-                .ToArrayAsync();
+            var newArrivals = await GetProductCardsAsync(
+                liveProducts
+                    .Where(p => p.IsNew)
+                    .OrderByDescending(p => p.PublishedAtUtc),
+                12);
 
-            // Featured collections -> products from featured collections
-            var featuredCollections = await _db.Products.AsNoTracking()
-                .Where(p => p.Status == Domain.Enums.ProductStatus.Published && p.IsVisible && p.IsPurchasable && p.CollectionMaps.Any(cm => cm.Collection.IsFeatured && cm.Collection.IsActive))
-                .OrderByDescending(p => p.SortRank)
-                .Take(12)
-                .Select(p => MapToProductCard(p))
-                .ToArrayAsync();
+            var bestsellers = await GetProductCardsAsync(
+                liveProducts
+                    .Where(p => p.IsBestseller)
+                    .OrderByDescending(p => p.SortRank),
+                12);
 
-            // Brand wall: featured active brands (return slugs)
+            var featuredCollectionIds = _db.Collections.AsNoTracking()
+                .Where(c => c.IsFeatured && c.IsActive)
+                .Select(c => c.Id);
+
+            var featuredCollections = await GetProductCardsAsync(
+                liveProducts
+                    .Where(p => p.CollectionMaps.Any(cm => featuredCollectionIds.Contains(cm.CollectionId)))
+                    .OrderByDescending(p => p.SortRank),
+                12);
+
             var brandWall = await _db.Brands.AsNoTracking()
                 .Where(b => b.IsActive && b.IsFeatured)
                 .OrderBy(b => b.SortOrder)
                 .Select(b => b.Slug)
                 .ToArrayAsync();
 
-            // Store teaser: pick first active store
             var storeTeaser = await _db.Stores.AsNoTracking()
                 .Where(s => s.IsActive)
                 .OrderBy(s => s.SortOrder)
                 .Select(s => new StoreTeaserDto(s.Name, s.Slug, s.CoverImageUrl ?? string.Empty))
                 .FirstOrDefaultAsync();
 
-            // Category cards: try to map from modules if payload contains category slugs; fallback to empty
             ProductCardDto[] categoryCards = Array.Empty<ProductCardDto>();
             try
             {
-                var modules = page.Modules?.ToList();
-                if (modules != null)
+                var productSlugs = ExtractModuleProductSlugs(page.Modules);
+                if (productSlugs.Length > 0)
                 {
-                    // find modules that explicitly list product slugs or category slugs
-                    var firstModule = modules.FirstOrDefault();
-                    if (firstModule != null && firstModule.Payload is JsonElement je)
-                    {
-                        if (je.TryGetProperty("productSlugs", out var prodSlugs) && prodSlugs.ValueKind == JsonValueKind.Array)
-                        {
-                            var slugs = prodSlugs.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).ToArray();
-                            if (slugs.Length > 0)
-                            {
-                                categoryCards = await _db.Products.AsNoTracking().Where(p => slugs.Contains(p.Slug) && p.IsVisible && p.IsPurchasable).Select(p => MapToProductCard(p)).ToArrayAsync();
-                            }
-                        }
-                    }
+                    categoryCards = await GetProductCardsAsync(
+                        liveProducts
+                            .Where(p => productSlugs.Contains(p.Slug))
+                            .OrderBy(p => p.Name),
+                        productSlugs.Length);
                 }
             }
             catch
@@ -103,38 +100,93 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
             return new HomePageDto(
                 seo,
                 AnnouncementBar: null,
-                new HeroSectionDto(page.Title, string.Empty, string.Empty),
-                categoryCards,
-                newArrivals,
-                featuredCollections,
-                bestsellers,
-                brandWall,
+                HeroSection: new HeroSectionDto(page.Title, string.Empty, string.Empty),
+                CategoryCards: categoryCards,
+                NewArrivals: newArrivals,
+                FeaturedCollections: featuredCollections,
+                Bestsellers: bestsellers,
+                BrandWall: brandWall,
                 EditorialStatement: null,
-                storeTeaser,
+                StoreTeaser: storeTeaser,
                 TrustItems: Array.Empty<TrustItemDto>(),
-                Newsletter: null
-            );
+                Newsletter: null);
         }
 
-        private static ProductCardDto MapToProductCard(TrendplusProdavnica.Domain.Catalog.Product p)
+        private async Task<ProductCardDto[]> GetProductCardsAsync(IQueryable<Domain.Catalog.Product> query, int take)
         {
-            // Note: this method will be used only inside EF projection via Select, so must be translatable.
-            // We construct using client-evaluable helpers in projection where necessary.
+            var projected = await query
+                .Take(take)
+                .Select(p => new ProductCardProjection(
+                    p.Id,
+                    p.Slug,
+                    _db.Brands.Where(b => b.Id == p.BrandId).Select(b => b.Name).FirstOrDefault() ?? string.Empty,
+                    p.Name,
+                    p.Media.Where(m => m.IsPrimary).Select(m => m.Url).FirstOrDefault()
+                        ?? p.Media.OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault()
+                        ?? string.Empty,
+                    p.Media.Where(m => !m.IsPrimary).OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault(),
+                    p.Variants.OrderBy(v => v.Price).Select(v => v.Price).FirstOrDefault(),
+                    p.Variants.OrderBy(v => v.Price).Select(v => v.OldPrice).FirstOrDefault(),
+                    p.Variants.Select(v => v.Currency).FirstOrDefault() ?? "RSD",
+                    p.IsNew,
+                    p.Variants.Any(v => v.StockStatus != StockStatus.OutOfStock && v.IsActive),
+                    p.Variants.Count(v => v.IsActive),
+                    p.PrimaryColorName))
+                .ToArrayAsync();
+
+            return projected.Select(MapToProductCard).ToArray();
+        }
+
+        private static ProductCardDto MapToProductCard(ProductCardProjection projection)
+        {
+            var badges = projection.IsNew ? new[] { "Novi" } : Array.Empty<string>();
+
             return new ProductCardDto(
-                p.Id,
-                p.Slug,
-                "", // brand name filled in projection by caller when using DbContext
-                p.Name,
-                p.Media.Where(m => m.IsPrimary).Select(m => m.Url).FirstOrDefault() ?? p.Media.OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault() ?? string.Empty,
-                p.Media.Where(m => !m.IsPrimary).OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault(),
-                p.Variants.OrderBy(v => v.Price).Select(v => v.Price).FirstOrDefault(),
-                p.Variants.OrderBy(v => v.Price).Select(v => v.OldPrice).FirstOrDefault(),
-                p.Variants.Select(v => v.Currency).FirstOrDefault() ?? "RSD",
-                new string[] { p.IsNew ? "Novi" : string.Empty }.Where(s => !string.IsNullOrEmpty(s)).ToArray(),
-                p.Variants.Any(v => v.StockStatus != Domain.Enums.StockStatus.OutOfStock && v.IsActive),
-                p.Variants.Count(v => v.IsActive),
-                p.PrimaryColorName
-            );
+                projection.Id,
+                projection.Slug,
+                projection.BrandName,
+                projection.Name,
+                projection.PrimaryImageUrl,
+                projection.SecondaryImageUrl,
+                projection.Price,
+                projection.OldPrice,
+                projection.Currency,
+                badges,
+                projection.IsInStock,
+                projection.AvailableSizesCount,
+                projection.ColorLabel);
+        }
+
+        private static string[] ExtractModuleProductSlugs(IEnumerable<HomeModule> modules)
+        {
+            var slugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var module in modules)
+            {
+                if (module.Payload is not JsonElement payload || payload.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (!payload.TryGetProperty("productSlugs", out var productSlugs) || productSlugs.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var item in productSlugs.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String)
+                    {
+                        var slug = item.GetString();
+                        if (!string.IsNullOrWhiteSpace(slug))
+                        {
+                            slugs.Add(slug);
+                        }
+                    }
+                }
+            }
+
+            return slugs.ToArray();
         }
 
         private static HomePageDto EmptyHomePage() => new HomePageDto(
@@ -149,7 +201,21 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
             null,
             null,
             Array.Empty<TrustItemDto>(),
-            null
-        );
+            null);
+
+        private sealed record ProductCardProjection(
+            long Id,
+            string Slug,
+            string BrandName,
+            string Name,
+            string PrimaryImageUrl,
+            string? SecondaryImageUrl,
+            decimal Price,
+            decimal? OldPrice,
+            string Currency,
+            bool IsNew,
+            bool IsInStock,
+            int AvailableSizesCount,
+            string? ColorLabel);
     }
 }

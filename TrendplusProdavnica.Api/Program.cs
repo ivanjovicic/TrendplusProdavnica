@@ -1,8 +1,20 @@
+using Microsoft.EntityFrameworkCore;
+using TrendplusProdavnica.Infrastructure.DependencyInjection;
+using TrendplusProdavnica.Infrastructure.Persistence;
+
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("TrendplusDb");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Connection string 'TrendplusDb' is not configured.");
+}
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddDbContext<TrendplusDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddInfrastructureQueries();
 
 var app = builder.Build();
 
