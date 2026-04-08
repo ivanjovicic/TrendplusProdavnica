@@ -20,7 +20,48 @@ namespace TrendplusProdavnica.Application.Catalog.Queries
         bool? InStockOnly = null
     );
 
-    public record GetBrandListingQuery(string Slug, int Page = 1, int PageSize = 24) ;
-    public record GetCollectionListingQuery(string Slug, int Page = 1, int PageSize = 24);
-    public record GetSaleListingQuery(int Page = 1, int PageSize = 24);
+    public record GetBrandListingQuery(
+        string Slug,
+        int Page = 1,
+        int PageSize = 24,
+        string? Sort = null,
+        long[]? Sizes = null,
+        string[]? Colors = null,
+        long[]? Brands = null,
+        decimal? PriceFrom = null,
+        decimal? PriceTo = null,
+        bool? IsOnSale = null,
+        bool? IsNew = null,
+        bool? InStockOnly = null
+    );
+
+    public record GetCollectionListingQuery(
+        string Slug,
+        int Page = 1,
+        int PageSize = 24,
+        string? Sort = null,
+        long[]? Sizes = null,
+        string[]? Colors = null,
+        long[]? Brands = null,
+        decimal? PriceFrom = null,
+        decimal? PriceTo = null,
+        bool? IsOnSale = null,
+        bool? IsNew = null,
+        bool? InStockOnly = null
+    );
+
+    public record GetSaleListingQuery(
+        int Page = 1,
+        int PageSize = 24,
+        string? Sort = null,
+        long[]? Sizes = null,
+        string[]? Colors = null,
+        long[]? Brands = null,
+        decimal? PriceFrom = null,
+        decimal? PriceTo = null,
+        bool? IsOnSale = null,
+        bool? IsNew = null,
+        bool? InStockOnly = null
+    );
 }
+

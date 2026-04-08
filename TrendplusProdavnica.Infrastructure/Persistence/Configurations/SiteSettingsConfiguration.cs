@@ -21,8 +21,12 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
             builder.Property(x => x.SupportPhone).HasMaxLength(40);
 
             // JSONB fields
-            builder.Property(x => x.SocialLinks).HasColumnType("jsonb");
-            builder.Property(x => x.ContactInfo).HasColumnType("jsonb");
+            builder.Property(x => x.SocialLinks)
+                .HasConversion(new JsonValueConverter<IEnumerable<TrendplusProdavnica.Domain.ValueObjects.SocialLink>>())
+                .HasColumnType("jsonb");
+            builder.Property(x => x.ContactInfo)
+                .HasConversion(new JsonValueConverter<TrendplusProdavnica.Domain.ValueObjects.ContactInfo>())
+                .HasColumnType("jsonb");
             builder.Property(x => x.AnalyticsSettings).HasColumnType("jsonb");
         }
     }

@@ -53,6 +53,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Owned<TrendplusProdavnica.Domain.ValueObjects.SeoMetadata>();
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(TrendplusDbContext).Assembly);
 
             var seededAtUtc = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using TrendplusProdavnica.Application.Catalog.Queries;
+using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Infrastructure.DependencyInjection;
 using TrendplusProdavnica.Infrastructure.Persistence;
 
@@ -30,6 +32,27 @@ var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
+
+app.MapGet("/catalog/category/{slug}", async (
+    string slug,
+    IProductListingQueryService listingService,
+    int page,
+    int pageSize,
+    string? sort,
+    long[]? sizes,
+    string[]? colors,
+    long[]? brands,
+    decimal? priceFrom,
+    decimal? priceTo,
+    bool? isOnSale,
+    bool? isNew,
+    bool? inStockOnly) =>
+{
+    var query = new GetCategoryListingQuery(slug, page, pageSize, sort, sizes, colors, brands, priceFrom, priceTo, isOnSale, isNew, inStockOnly);
+    var result = await listingService.GetCategoryListingAsync(query);
+    return Results.Ok(result);
+})
+.WithName("GetCategoryListing");
 
 app.MapGet("/weatherforecast", () =>
 {

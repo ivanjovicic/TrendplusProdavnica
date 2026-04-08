@@ -16,7 +16,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
             builder.Property(x => x.Name).IsRequired().HasMaxLength(160);
             builder.Property(x => x.Code).HasMaxLength(60);
             builder.Property(x => x.DiscountValue).HasPrecision(12, 2);
-            builder.Property<short>("DiscountType").HasConversion<short>();
+            builder.Property(x => x.DiscountType).HasConversion<short>();
             builder.Property(x => x.BadgeText).HasMaxLength(40);
             builder.Property(x => x.Priority).HasDefaultValue((short)0);
             builder.Property(x => x.IsActive).HasDefaultValue(true);
