@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -6,80 +8,108 @@ using TrendplusProdavnica.Application.Catalog.Dtos;
 using TrendplusProdavnica.Application.Content.Dtos;
 using TrendplusProdavnica.Application.Content.Queries;
 using TrendplusProdavnica.Application.Content.Services;
-using TrendplusProdavnica.Domain.Catalog;
-using TrendplusProdavnica.Domain.Enums;
 using TrendplusProdavnica.Infrastructure.Persistence;
+using TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog;
 
 namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
 {
     public class BrandPageQueryService : IBrandPageQueryService
     {
         private readonly TrendplusDbContext _db;
-        public BrandPageQueryService(TrendplusDbContext db) => _db = db;
+
+        public BrandPageQueryService(TrendplusDbContext db)
+        {
+            _db = db;
+        }
 
         public async Task<BrandPageDto> GetBrandPageAsync(GetBrandPageQuery query)
         {
             var brand = await _db.Brands.AsNoTracking()
-                .Where(b => b.Slug == query.Slug)
-                .Select(b => new { b.Id, b.Name, b.Slug, b.Seo })
+                .Where(entity => entity.Slug == query.Slug && entity.IsActive)
+                .Select(entity => new
+                {
+                    entity.Id,
+                    entity.Name,
+                    entity.Slug,
+                    entity.ShortDescription,
+                    entity.LongDescription,
+                    entity.Seo
+                })
                 .FirstOrDefaultAsync();
 
             if (brand is null)
-                throw new System.Collections.Generic.KeyNotFoundException("Brand not found");
+            {
+                throw new KeyNotFoundException($"Brand '{query.Slug}' was not found.");
+            }
 
-            var pageContent = await _db.BrandPageContents.AsNoTracking()
-                .Where(pc => pc.BrandId == brand.Id && pc.IsPublished)
-                .Select(pc => new { pc.IntroText, pc.Faq, pc.Seo })
+            var content = await _db.BrandPageContents.AsNoTracking()
+                .Where(entity => entity.BrandId == brand.Id && entity.IsPublished)
+                .Select(entity => new
+                {
+                    entity.IntroText,
+                    entity.Faq,
+                    entity.Seo
+                })
                 .FirstOrDefaultAsync();
 
-            var featuredProducts = await _db.Products.AsNoTracking()
-                .Where(p => p.BrandId == brand.Id && p.IsVisible && p.IsPurchasable && p.Status == ProductStatus.Published)
-                .OrderByDescending(p => p.IsBestseller)
-                .ThenByDescending(p => p.SortRank)
-                .Take(12)
-                .Select(p => new ProductCardDto(
-                    p.Id,
-                    p.Slug,
-                    brand.Name,
-                    p.Name,
-                    p.Media.Where(m => m.IsActive && m.IsPrimary).Select(m => m.Url).FirstOrDefault() ?? p.Media.Where(m => m.IsActive).OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault() ?? string.Empty,
-                    p.Media.Where(m => m.IsActive && !m.IsPrimary).OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault(),
-                    p.Variants.Where(v => v.IsActive && v.IsVisible).OrderBy(v => v.Price).Select(v => v.Price).FirstOrDefault(),
-                    p.Variants.Where(v => v.IsActive && v.IsVisible).OrderBy(v => v.Price).Select(v => v.OldPrice).FirstOrDefault(),
-                    p.Variants.Where(v => v.IsActive && v.IsVisible).Select(v => v.Currency).FirstOrDefault() ?? "RSD",
-                    new[] { p.IsNew ? "Novi" : string.Empty }.Where(s => !string.IsNullOrEmpty(s)).ToArray(),
-                    p.Variants.Any(v => v.IsActive && v.IsVisible && v.StockStatus != StockStatus.OutOfStock),
-                    p.Variants.Count(v => v.IsActive && v.IsVisible),
-                    p.PrimaryColorName
-                ))
+            var productsQuery = ProductQueryMappingHelper
+                .ApplyBaseProductVisibility(_db.Products.AsNoTracking())
+                .Where(product => product.BrandId == brand.Id);
+            var featuredProjections = await ProductQueryMappingHelper
+                .ToProductCardProjection(
+                    productsQuery
+                        .OrderByDescending(product => product.IsBestseller)
+                        .ThenByDescending(product => product.SortRank)
+                        .ThenByDescending(product => product.PublishedAtUtc)
+                        .Take(12),
+                    _db.Brands.AsNoTracking())
                 .ToArrayAsync();
 
-            var categoryEntities = await _db.Categories.AsNoTracking()
-                .Where(c => c.IsActive && _db.Products.Any(p =>
-                    p.BrandId == brand.Id &&
-                    p.IsVisible &&
-                    p.IsPurchasable &&
-                    p.Status == ProductStatus.Published &&
-                    (p.PrimaryCategoryId == c.Id || p.CategoryMaps.Any(cm => cm.CategoryId == c.Id))))
-                .Select(c => new { c.Name, c.Slug })
+            var categoryIds = await productsQuery
+                .Select(product => product.PrimaryCategoryId)
+                .Concat(productsQuery.SelectMany(product => product.CategoryMaps.Select(map => map.CategoryId)))
                 .Distinct()
-                .OrderBy(c => c.Name)
                 .ToArrayAsync();
 
-            var categoryLinks = categoryEntities
-                .Select(c => new BreadcrumbItemDto(c.Name, $"/kategorija/{c.Slug}"))
+            var categoryLinks = categoryIds.Length == 0
+                ? Array.Empty<BreadcrumbItemDto>()
+                : await _db.Categories.AsNoTracking()
+                    .Where(category => categoryIds.Contains(category.Id) && category.IsActive)
+                    .OrderBy(category => category.SortOrder)
+                    .ThenBy(category => category.Name)
+                    .Select(category => new BreadcrumbItemDto(
+                        category.Name,
+                        $"/kategorija/{category.Slug}"))
+                    .ToArrayAsync();
+
+            var introText = content?.IntroText ?? brand.LongDescription ?? brand.ShortDescription ?? string.Empty;
+            var seo = ProductQueryMappingHelper.MapSeo(
+                content?.Seo ?? brand.Seo,
+                brand.Name,
+                brand.ShortDescription ?? string.Empty);
+
+            return new BrandPageDto(
+                brand.Name,
+                brand.Slug,
+                introText,
+                seo,
+                ProductQueryMappingHelper.ToProductCardDtos(featuredProjections),
+                categoryLinks,
+                MapFaq(content?.Faq));
+        }
+
+        private static FaqItemDto[]? MapFaq(IEnumerable<Domain.ValueObjects.FaqItem>? faq)
+        {
+            if (faq is null)
+            {
+                return null;
+            }
+
+            var mapped = faq
+                .Select(item => new FaqItemDto(item.Question, item.Answer))
                 .ToArray();
 
-            var seo = new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(
-                pageContent?.Seo?.SeoTitle ?? brand.Name,
-                pageContent?.Seo?.SeoDescription ?? string.Empty,
-                pageContent?.Seo?.CanonicalUrl,
-                null);
-
-            var introText = pageContent?.IntroText ?? string.Empty;
-            var faq = pageContent?.Faq?.Select(f => new FaqItemDto(f.Question ?? string.Empty, f.Answer ?? string.Empty)).ToArray();
-
-            return new BrandPageDto(brand.Name, brand.Slug, introText, seo, featuredProducts, categoryLinks, faq);
+            return mapped.Length == 0 ? null : mapped;
         }
     }
 }

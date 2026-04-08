@@ -1,76 +1,133 @@
 #nullable enable
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using TrendplusProdavnica.Application.Catalog.Dtos;
 using TrendplusProdavnica.Application.Content.Dtos;
 using TrendplusProdavnica.Application.Content.Queries;
 using TrendplusProdavnica.Application.Content.Services;
-using TrendplusProdavnica.Domain.Catalog;
-using TrendplusProdavnica.Domain.Enums;
 using TrendplusProdavnica.Infrastructure.Persistence;
+using TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog;
 
 namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
 {
     public class CollectionPageQueryService : ICollectionPageQueryService
     {
         private readonly TrendplusDbContext _db;
-        public CollectionPageQueryService(TrendplusDbContext db) => _db = db;
+
+        public CollectionPageQueryService(TrendplusDbContext db)
+        {
+            _db = db;
+        }
 
         public async Task<CollectionPageDto> GetCollectionPageAsync(GetCollectionPageQuery query)
         {
-            var col = await _db.Collections.AsNoTracking()
-                .Where(c => c.Slug == query.Slug)
-                .Select(c => new { c.Id, c.Name, c.Slug, c.Seo })
+            var collection = await _db.Collections.AsNoTracking()
+                .Where(entity => entity.Slug == query.Slug && entity.IsActive)
+                .Select(entity => new
+                {
+                    entity.Id,
+                    entity.Name,
+                    entity.Slug,
+                    entity.ShortDescription,
+                    entity.LongDescription,
+                    entity.Seo
+                })
                 .FirstOrDefaultAsync();
 
-            if (col is null)
-                throw new System.Collections.Generic.KeyNotFoundException("Collection not found");
+            if (collection is null)
+            {
+                throw new KeyNotFoundException($"Collection '{query.Slug}' was not found.");
+            }
 
-            var pageContent = await _db.CollectionPageContents.AsNoTracking()
-                .Where(pc => pc.CollectionId == col.Id && pc.IsPublished)
-                .Select(pc => new { pc.IntroText, pc.Faq, pc.MerchBlocks, pc.Seo })
+            var content = await _db.CollectionPageContents.AsNoTracking()
+                .Where(entity => entity.CollectionId == collection.Id && entity.IsPublished)
+                .Select(entity => new
+                {
+                    entity.IntroText,
+                    entity.Faq,
+                    entity.MerchBlocks,
+                    entity.Seo
+                })
                 .FirstOrDefaultAsync();
 
-            var featuredProducts = await _db.ProductCollectionMaps.AsNoTracking()
-                .Where(cm => cm.CollectionId == col.Id)
-                .Join(_db.Products.AsNoTracking(),
-                    cm => cm.ProductId,
-                    p => p.Id,
-                    (cm, p) => new { cm, p })
-                .Where(x => x.p.IsVisible && x.p.IsPurchasable && x.p.Status == ProductStatus.Published)
-                .OrderByDescending(x => x.cm.Pinned)
-                .ThenBy(x => x.cm.SortOrder)
-                .Select(x => new ProductCardDto(
-                    x.p.Id,
-                    x.p.Slug,
-                    _db.Brands.Where(b => b.Id == x.p.BrandId).Select(b => b.Name).FirstOrDefault() ?? string.Empty,
-                    x.p.Name,
-                    x.p.Media.Where(m => m.IsActive && m.IsPrimary).Select(m => m.Url).FirstOrDefault() ?? x.p.Media.Where(m => m.IsActive).OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault() ?? string.Empty,
-                    x.p.Media.Where(m => m.IsActive && !m.IsPrimary).OrderBy(m => m.SortOrder).Select(m => m.Url).FirstOrDefault(),
-                    x.p.Variants.Where(v => v.IsActive && v.IsVisible).OrderBy(v => v.Price).Select(v => v.Price).FirstOrDefault(),
-                    x.p.Variants.Where(v => v.IsActive && v.IsVisible).OrderBy(v => v.Price).Select(v => v.OldPrice).FirstOrDefault(),
-                    x.p.Variants.Where(v => v.IsActive && v.IsVisible).Select(v => v.Currency).FirstOrDefault() ?? "RSD",
-                    new[] { x.p.IsNew ? "Novi" : string.Empty }.Where(s => !string.IsNullOrEmpty(s)).ToArray(),
-                    x.p.Variants.Any(v => v.IsActive && v.IsVisible && v.StockStatus != StockStatus.OutOfStock),
-                    x.p.Variants.Count(v => v.IsActive && v.IsVisible),
-                    x.p.PrimaryColorName
-                ))
-                .Take(12)
+            var orderedProductIds = await (
+                    from map in _db.ProductCollectionMaps.AsNoTracking()
+                    join product in ProductQueryMappingHelper.ApplyBaseProductVisibility(_db.Products.AsNoTracking())
+                        on map.ProductId equals product.Id
+                    where map.CollectionId == collection.Id
+                    orderby map.Pinned descending,
+                            map.SortOrder ascending,
+                            product.SortRank descending,
+                            product.PublishedAtUtc descending,
+                            product.Id descending
+                    select map.ProductId)
+                .Take(48)
                 .ToArrayAsync();
 
-            var merchBlocks = pageContent?.MerchBlocks?.Select(mb => new MerchBlockDto(mb.Title ?? string.Empty, mb.Html ?? string.Empty, (mb.ProductSlugs ?? Array.Empty<string>()).ToArray())).ToArray() ?? Array.Empty<MerchBlockDto>();
-            var faq = pageContent?.Faq?.Select(f => new FaqItemDto(f.Question ?? string.Empty, f.Answer ?? string.Empty)).ToArray();
+            var featuredProducts = Array.Empty<TrendplusProdavnica.Application.Catalog.Dtos.ProductCardDto>();
 
-            var seo = new TrendplusProdavnica.Application.Catalog.Dtos.SeoDto(
-                pageContent?.Seo?.SeoTitle ?? col.Name,
-                pageContent?.Seo?.SeoDescription ?? string.Empty,
-                pageContent?.Seo?.CanonicalUrl,
-                null);
+            if (orderedProductIds.Length > 0)
+            {
+                var projections = await ProductQueryMappingHelper
+                    .ToProductCardProjection(
+                        ProductQueryMappingHelper.ApplyBaseProductVisibility(_db.Products.AsNoTracking())
+                            .Where(product => orderedProductIds.Contains(product.Id)),
+                        _db.Brands.AsNoTracking())
+                    .ToArrayAsync();
 
-            var introText = pageContent?.IntroText ?? string.Empty;
+                var indexById = orderedProductIds
+                    .Select((id, index) => new { id, index })
+                    .ToDictionary(item => item.id, item => item.index);
 
-            return new CollectionPageDto(col.Name, col.Slug, introText, seo, featuredProducts, merchBlocks, faq);
+                featuredProducts = ProductQueryMappingHelper
+                    .ToProductCardDtos(projections.OrderBy(item => indexById[item.Id]));
+            }
+
+            var introText = content?.IntroText ?? collection.LongDescription ?? collection.ShortDescription ?? string.Empty;
+            var seo = ProductQueryMappingHelper.MapSeo(
+                content?.Seo ?? collection.Seo,
+                collection.Name,
+                collection.ShortDescription ?? string.Empty);
+
+            return new CollectionPageDto(
+                collection.Name,
+                collection.Slug,
+                introText,
+                seo,
+                featuredProducts,
+                MapMerchBlocks(content?.MerchBlocks),
+                MapFaq(content?.Faq));
+        }
+
+        private static MerchBlockDto[] MapMerchBlocks(IEnumerable<Domain.ValueObjects.MerchBlock>? blocks)
+        {
+            if (blocks is null)
+            {
+                return Array.Empty<MerchBlockDto>();
+            }
+
+            return blocks
+                .Select(block => new MerchBlockDto(
+                    block.Title,
+                    block.Html ?? string.Empty,
+                    (block.ProductSlugs ?? Array.Empty<string>()).ToArray()))
+                .ToArray();
+        }
+
+        private static FaqItemDto[]? MapFaq(IEnumerable<Domain.ValueObjects.FaqItem>? faq)
+        {
+            if (faq is null)
+            {
+                return null;
+            }
+
+            var mapped = faq
+                .Select(item => new FaqItemDto(item.Question, item.Answer))
+                .ToArray();
+
+            return mapped.Length == 0 ? null : mapped;
         }
     }
 }

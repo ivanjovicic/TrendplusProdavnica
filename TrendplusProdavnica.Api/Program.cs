@@ -6,6 +6,8 @@ using TrendplusProdavnica.Application.Content.Queries;
 using TrendplusProdavnica.Application.Content.Services;
 using TrendplusProdavnica.Application.Stores.Queries;
 using TrendplusProdavnica.Application.Stores.Services;
+using TrendplusProdavnica.Application.Cart.Services;
+using TrendplusProdavnica.Application.Cart.Dtos;
 using TrendplusProdavnica.Infrastructure.DependencyInjection;
 using TrendplusProdavnica.Infrastructure.Persistence;
 
@@ -21,6 +23,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<TrendplusDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddInfrastructureQueries();
+builder.Services.AddCartServices();
 
 var app = builder.Build();
 
@@ -28,6 +31,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    await app.Services.SeedDevelopmentDataAsync();
 }
 
 app.UseHttpsRedirection();
@@ -450,6 +454,174 @@ async Task<IResult> StoreDetailEndpoint(
     catch (KeyNotFoundException ex)
     {
         return Results.NotFound(new { error = "Store not found", message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+// ============================================================
+// CART ENDPOINTS
+// ============================================================
+
+app.MapPost("/api/cart", CreateCartEndpoint)
+    .WithName("CreateCart")
+    .WithSummary("Create a new shopping cart")
+    .WithDescription("Creates a new empty cart and returns it with a unique token")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+async Task<IResult> CreateCartEndpoint(ICartService cartService)
+{
+    try
+    {
+        var result = await cartService.CreateCartAsync();
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+app.MapGet("/api/cart/{cartToken}", GetCartEndpoint)
+    .WithName("GetCart")
+    .WithSummary("Get shopping cart")
+    .WithDescription("Retrieves cart contents with all items and product details")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status404NotFound);
+
+async Task<IResult> GetCartEndpoint(
+    string cartToken,
+    ICartService cartService)
+{
+    try
+    {
+        var result = await cartService.GetCartAsync(cartToken);
+        if (result == null)
+            return Results.NotFound(new { error = "Cart not found", message = $"Cart {cartToken} not found" });
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+app.MapPost("/api/cart/{cartToken}/items", AddItemEndpoint)
+    .WithName("AddCartItem")
+    .WithSummary("Add item to cart")
+    .WithDescription("Adds a product variant to cart (or increases quantity if already in cart)")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status400BadRequest)
+    .ProducesProblem(StatusCodes.Status404NotFound);
+
+async Task<IResult> AddItemEndpoint(
+    string cartToken,
+    AddToCartRequest request,
+    ICartService cartService)
+{
+    try
+    {
+        if (request.Quantity <= 0)
+            return Results.BadRequest(new { error = "Invalid quantity", message = "Quantity must be greater than 0" });
+
+        var result = await cartService.AddItemAsync(cartToken, request);
+        return Results.Ok(result);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = "Not found", message = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = "Invalid operation", message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+app.MapPatch("/api/cart/{cartToken}/items/{itemId}", UpdateItemEndpoint)
+    .WithName("UpdateCartItem")
+    .WithSummary("Update cart item quantity")
+    .WithDescription("Updates the quantity of an existing cart item")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status400BadRequest)
+    .ProducesProblem(StatusCodes.Status404NotFound);
+
+async Task<IResult> UpdateItemEndpoint(
+    string cartToken,
+    long itemId,
+    UpdateCartItemRequest request,
+    ICartService cartService)
+{
+    try
+    {
+        if (request.Quantity <= 0)
+            return Results.BadRequest(new { error = "Invalid quantity", message = "Quantity must be greater than 0" });
+
+        var result = await cartService.UpdateItemQuantityAsync(cartToken, itemId, request);
+        return Results.Ok(result);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = "Not found", message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+app.MapDelete("/api/cart/{cartToken}/items/{itemId}", RemoveItemEndpoint)
+    .WithName("RemoveCartItem")
+    .WithSummary("Remove item from cart")
+    .WithDescription("Removes a single item from the cart")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status404NotFound);
+
+async Task<IResult> RemoveItemEndpoint(
+    string cartToken,
+    long itemId,
+    ICartService cartService)
+{
+    try
+    {
+        var result = await cartService.RemoveItemAsync(cartToken, itemId);
+        return Results.Ok(result);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = "Not found", message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+app.MapDelete("/api/cart/{cartToken}/items", ClearCartEndpoint)
+    .WithName("ClearCart")
+    .WithSummary("Clear cart")
+    .WithDescription("Removes all items from the cart")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status404NotFound);
+
+async Task<IResult> ClearCartEndpoint(
+    string cartToken,
+    ICartService cartService)
+{
+    try
+    {
+        var result = await cartService.ClearCartAsync(cartToken);
+        return Results.Ok(result);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = "Not found", message = ex.Message });
     }
     catch (Exception ex)
     {

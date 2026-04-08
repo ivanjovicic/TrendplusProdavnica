@@ -7,6 +7,7 @@ using TrendplusProdavnica.Domain.Enums;
 using TrendplusProdavnica.Domain.Inventory;
 using TrendplusProdavnica.Domain.Pricing;
 using TrendplusProdavnica.Domain.Shared;
+using TrendplusProdavnica.Domain.Sales;
 
 namespace TrendplusProdavnica.Infrastructure.Persistence
 {
@@ -50,6 +51,9 @@ namespace TrendplusProdavnica.Infrastructure.Persistence
         public DbSet<TrustPage> TrustPages { get; set; } = null!;
 
         public DbSet<SlugRedirect> SlugRedirects { get; set; } = null!;
+
+        public DbSet<Cart> Carts { get; set; } = null!;
+        public DbSet<CartItem> CartItems { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

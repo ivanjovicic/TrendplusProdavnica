@@ -93,4 +93,11 @@ namespace TrendplusProdavnica.Domain.Enums
         TrustPage = 7,
         SalePage = 8
     }
+
+    public enum CartStatus : short
+    {
+        Active = 1,
+        Abandoned = 2,
+        Converted = 3
+    }
 }

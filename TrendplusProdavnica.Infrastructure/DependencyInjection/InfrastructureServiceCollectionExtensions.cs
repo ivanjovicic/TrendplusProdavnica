@@ -3,9 +3,12 @@ using Microsoft.Extensions.DependencyInjection;
 using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Application.Content.Services;
 using TrendplusProdavnica.Application.Stores.Services;
+using TrendplusProdavnica.Application.Cart.Services;
+using TrendplusProdavnica.Infrastructure.Persistence.Seeding;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Content;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Stores;
+using TrendplusProdavnica.Infrastructure.Services;
 
 namespace TrendplusProdavnica.Infrastructure.DependencyInjection
 {
@@ -20,6 +23,14 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
             services.AddScoped<ICollectionPageQueryService, CollectionPageQueryService>();
             services.AddScoped<IEditorialQueryService, EditorialQueryService>();
             services.AddScoped<IStoreQueryService, StoreQueryService>();
+            services.AddScoped<DevelopmentDataSeeder>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddCartServices(this IServiceCollection services)
+        {
+            services.AddScoped<ICartService, CartService>();
 
             return services;
         }

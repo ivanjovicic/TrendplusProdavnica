@@ -32,7 +32,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
             builder.Property(x => x.SortRank).HasDefaultValue(0);
 
             // Search vector column - provider-specific; create as tsvector via migration
-            builder.Property<string?>("search_vector").HasColumnType("tsvector");
+            // Note: This is handled at migration time for PostgreSQL full-text search
+            // builder.Property<string?>("search_vector").HasColumnType("tsvector");
 
             // Unique slug
             builder.HasIndex(x => x.Slug).IsUnique().HasDatabaseName("ux_products_slug");
