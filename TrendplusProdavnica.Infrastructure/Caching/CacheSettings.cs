@@ -21,7 +21,7 @@ namespace TrendplusProdavnica.Infrastructure.Caching
     public sealed class CacheDurationSettings
     {
         public TimeSpan HomePage { get; set; } = TimeSpan.FromMinutes(5);
-        public TimeSpan ProductDetail { get; set; } = TimeSpan.FromMinutes(3);
+        public TimeSpan ProductDetail { get; set; } = TimeSpan.FromMinutes(5);
         public TimeSpan BrandPage { get; set; } = TimeSpan.FromMinutes(4);
         public TimeSpan CollectionPage { get; set; } = TimeSpan.FromMinutes(4);
         public TimeSpan StorePage { get; set; } = TimeSpan.FromMinutes(4);
@@ -44,6 +44,6 @@ namespace TrendplusProdavnica.Infrastructure.Caching
         public bool Enabled { get; set; } = true;
         public TimeSpan HomePageDuration { get; set; } = TimeSpan.FromMinutes(5);
         public TimeSpan EntityPageDuration { get; set; } = TimeSpan.FromSeconds(30);
-        public TimeSpan ProductDetailDuration { get; set; } = TimeSpan.FromSeconds(20);
+        public TimeSpan ProductDetailDuration { get; set; } = TimeSpan.FromMinutes(5);
     }
 }

@@ -1,6 +1,8 @@
 #nullable enable
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.OutputCaching;
+using System.Globalization;
+using TrendplusProdavnica.Application.Catalog.Listing;
 using TrendplusProdavnica.Application.Catalog.Queries;
 using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Application.Content.Queries;
@@ -106,6 +108,80 @@ static (bool isValid, IResult? errorResult) ValidateSearchParameters(
     }
 
     return (true, null);
+}
+
+static (bool isValid, IResult? errorResult) ValidatePlpParameters(
+    int page,
+    int pageSize,
+    string? sort)
+{
+    const int MaxPageSize = 120;
+
+    if (page < 1)
+        return (false, Results.BadRequest(new { error = "Invalid page", message = "Page must be 1 or greater." }));
+
+    if (pageSize <= 0 || pageSize > MaxPageSize)
+        return (false, Results.BadRequest(new { error = "Invalid pageSize", message = $"PageSize must be between 1 and {MaxPageSize}." }));
+
+    if (!string.IsNullOrWhiteSpace(sort) &&
+        !new[] { "popular", "price_asc", "price_desc", "newest" }.Contains(sort, StringComparer.OrdinalIgnoreCase))
+    {
+        return (false, Results.BadRequest(new { error = "Invalid sort", message = "Sort must be one of: popular, price_asc, price_desc, newest." }));
+    }
+
+    return (true, null);
+}
+
+static decimal[] ParseDecimalFilters(string[]? values)
+{
+    if (values is null || values.Length == 0)
+    {
+        return Array.Empty<decimal>();
+    }
+
+    var parsed = new List<decimal>();
+    foreach (var token in values.SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+    {
+        if (decimal.TryParse(token, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+        {
+            parsed.Add(number);
+        }
+    }
+
+    return parsed.Distinct().ToArray();
+}
+
+static long[] ParseLongFilters(string[]? values)
+{
+    if (values is null || values.Length == 0)
+    {
+        return Array.Empty<long>();
+    }
+
+    var parsed = new List<long>();
+    foreach (var token in values.SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+    {
+        if (long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+        {
+            parsed.Add(number);
+        }
+    }
+
+    return parsed.Distinct().ToArray();
+}
+
+static string[] ParseStringFilters(string[]? values)
+{
+    if (values is null || values.Length == 0)
+    {
+        return Array.Empty<string>();
+    }
+
+    return values
+        .SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
 }
 
 // ============================================================
@@ -353,6 +429,80 @@ async Task<IResult> SaleCategoryListingEndpoint(
 }
 
 // ============================================================
+// CATALOG PLP ENDPOINT
+// ============================================================
+
+app.MapGet("/api/catalog/products", CatalogProductsEndpoint)
+    .WithName("GetCatalogProducts")
+    .WithSummary("Get product listing page data")
+    .WithDescription("Returns paginated PLP products with facets and canonical URL.")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status400BadRequest);
+
+async Task<IResult> CatalogProductsEndpoint(
+    IProductListingReadService listingReadService,
+    string? category = null,
+    string? brand = null,
+    string? collection = null,
+    decimal? minPrice = null,
+    decimal? maxPrice = null,
+    string[]? sizes = null,
+    string[]? colors = null,
+    string[]? brands = null,
+    bool? isOnSale = null,
+    bool? isNew = null,
+    int page = 1,
+    int pageSize = 24,
+    string? sort = "popular")
+{
+    var (isValid, errorResult) = ValidatePlpParameters(page, pageSize, sort);
+    if (!isValid)
+    {
+        return errorResult!;
+    }
+
+    if (minPrice.HasValue && minPrice.Value < 0)
+    {
+        return Results.BadRequest(new { error = "Invalid minPrice", message = "minPrice must be >= 0." });
+    }
+
+    if (maxPrice.HasValue && maxPrice.Value < 0)
+    {
+        return Results.BadRequest(new { error = "Invalid maxPrice", message = "maxPrice must be >= 0." });
+    }
+
+    if (minPrice.HasValue && maxPrice.HasValue && minPrice.Value > maxPrice.Value)
+    {
+        return Results.BadRequest(new { error = "Invalid range", message = "minPrice cannot be greater than maxPrice." });
+    }
+
+    try
+    {
+        var query = new ProductListingQuery(
+            category,
+            brand,
+            collection,
+            minPrice,
+            maxPrice,
+            ParseDecimalFilters(sizes),
+            ParseStringFilters(colors),
+            ParseLongFilters(brands),
+            isOnSale,
+            isNew,
+            page,
+            pageSize,
+            sort);
+
+        var response = await listingReadService.GetProductsAsync(query);
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+// ============================================================
 // SEARCH ENDPOINTS
 // ============================================================
 
@@ -454,10 +604,10 @@ async Task<IResult> ReindexSingleProductEndpoint(long productId, IProductSearchI
 // PRODUCT ENDPOINTS
 // ============================================================
 
-var productDetailEndpoint = app.MapGet("/api/products/{slug}", ProductDetailEndpoint)
+var productDetailEndpoint = app.MapGet("/api/catalog/product/{slug}", ProductDetailEndpoint)
     .WithName("GetProductDetail")
     .WithSummary("Get product details")
-    .WithDescription("Returns complete product information including variants, media, and related data")
+    .WithDescription("Returns complete product information including variants, media, and related data with structured data for SEO")
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status404NotFound);
 

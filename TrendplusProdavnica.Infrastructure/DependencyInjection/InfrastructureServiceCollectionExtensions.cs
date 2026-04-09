@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenSearch.Client;
 using TrendplusProdavnica.Application.Admin.Services;
+using TrendplusProdavnica.Application.Catalog.Listing;
 using TrendplusProdavnica.Application.Common.Caching;
 using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Application.Content.Services;
@@ -129,6 +130,7 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
 
             services.AddScoped<IHomePageQueryService, CachedHomePageQueryService>();
             services.AddScoped<IProductListingQueryService, CachedProductListingQueryService>();
+            services.AddScoped<IProductListingReadService, ProductListingReadService>();
             services.AddScoped<IProductDetailQueryService, CachedProductDetailQueryService>();
             services.AddScoped<IBrandPageQueryService, CachedBrandPageQueryService>();
             services.AddScoped<ICollectionPageQueryService, CachedCollectionPageQueryService>();

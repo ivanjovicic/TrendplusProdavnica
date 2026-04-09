@@ -25,6 +25,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
             builder.Property(x => x.IsVisible).HasDefaultValue(true);
 
             builder.HasIndex(x => x.Sku).IsUnique().HasDatabaseName("ux_product_variants_sku");
+            builder.HasIndex(x => x.ProductId).HasDatabaseName("ix_product_variant_product_id");
+            builder.HasIndex(x => x.Price).HasDatabaseName("ix_product_variants_price");
 
             // Partial in-stock index created in migration for WHERE total_stock > 0 AND is_active = true AND is_visible = true
 

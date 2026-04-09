@@ -37,6 +37,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
 
             // Unique slug
             builder.HasIndex(x => x.Slug).IsUnique().HasDatabaseName("ux_products_slug");
+            builder.HasIndex(x => x.BrandId).HasDatabaseName("ix_products_brand_id");
+            builder.HasIndex(x => x.PrimaryCategoryId).HasDatabaseName("ix_products_primary_category_id");
 
             // Partial/live indexes: defined via migration for precise filters and includes
 
