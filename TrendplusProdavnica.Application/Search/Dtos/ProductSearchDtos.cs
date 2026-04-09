@@ -43,4 +43,20 @@ namespace TrendplusProdavnica.Application.Search.Dtos
         ProductSearchItemDto[] Items,
         ProductSearchPaginationDto Pagination,
         ProductSearchFacetsDto Facets);
+
+    /// <summary>
+    /// Autocomplete suggestion for product search
+    /// </summary>
+    public record ProductAutocompleteItemDto(
+        long ProductId,
+        string Slug,
+        string Name,
+        string BrandName,
+        string? PrimaryImageUrl);
+
+    /// <summary>
+    /// Autocomplete result with product suggestions
+    /// </summary>
+    public record ProductAutocompleteResultDto(
+        ProductAutocompleteItemDto[] Items);
 }

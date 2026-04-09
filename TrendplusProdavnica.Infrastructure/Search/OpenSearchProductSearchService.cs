@@ -81,6 +81,67 @@ namespace TrendplusProdavnica.Infrastructure.Search
                 facets);
         }
 
+        public async Task<ProductAutocompleteResultDto> AutocompleteAsync(ProductAutocompleteQuery query, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(query.QueryText))
+            {
+                return new ProductAutocompleteResultDto(Array.Empty<ProductAutocompleteItemDto>());
+            }
+
+            var normalizedText = query.QueryText.Trim();
+            var maxQueryLength = _searchSettings.MaxQueryLength <= 0 ? 120 : _searchSettings.MaxQueryLength;
+            normalizedText = normalizedText[..Math.Min(normalizedText.Length, maxQueryLength)];
+            var limit = Math.Max(1, Math.Min(query.Limit, 50));
+
+            var response = await _client.SearchAsync<ProductSearchDocument>(descriptor => descriptor
+                .Index(_openSearchSettings.IndexName)
+                .Size(limit)
+                .AllIndices(false)
+                .Query(queryDescriptor => queryDescriptor.MultiMatch(multiMatch => multiMatch
+                    .Query(normalizedText)
+                    .Operator(Operator.Or)
+                    .Fields(fields => fields
+                        .Field(field => field.Name, 3.0)
+                        .Field(field => field.ShortDescription, 1.0)
+                        .Field(field => field.SearchKeywords, 2.5)
+                        .Field("brandName", 2.0))))
+                .Sort(sort => sort
+                    .Descending(field => field.SortRank)
+                    .Descending(field => field.PublishedAtUtc)), cancellationToken);
+
+            if (!response.IsValid)
+            {
+                throw new InvalidOperationException(
+                    $"Product autocomplete query failed: {response.ServerError?.ToString() ?? response.OriginalException?.Message}");
+            }
+
+            var items = response.Documents
+                .Distinct(new ProductSearchDocumentSlugComparer())
+                .Select(doc => new ProductAutocompleteItemDto(
+                    doc.ProductId,
+                    doc.Slug,
+                    doc.Name,
+                    doc.BrandName,
+                    doc.PrimaryImageUrl))
+                .Take(limit)
+                .ToArray();
+
+            return new ProductAutocompleteResultDto(items);
+        }
+
+        private class ProductSearchDocumentSlugComparer : IEqualityComparer<ProductSearchDocument>
+        {
+            public bool Equals(ProductSearchDocument? x, ProductSearchDocument? y)
+            {
+                return x?.Slug == y?.Slug;
+            }
+
+            public int GetHashCode(ProductSearchDocument obj)
+            {
+                return obj.Slug.GetHashCode();
+            }
+        }
+
         private ProductSearchQuery Normalize(ProductSearchQuery query)
         {
             var page = query.Page < 1 ? 1 : query.Page;

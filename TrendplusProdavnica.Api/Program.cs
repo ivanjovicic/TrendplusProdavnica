@@ -506,6 +506,13 @@ async Task<IResult> CatalogProductsEndpoint(
 // SEARCH ENDPOINTS
 // ============================================================
 
+app.MapGet("/api/search/autocomplete", SearchAutocompleteEndpoint)
+    .WithName("SearchAutocomplete")
+    .WithSummary("Get autocomplete suggestions")
+    .WithDescription("Returns autocomplete suggestions for product search.")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status400BadRequest);
+
 app.MapGet("/api/search/products", SearchProductsEndpoint)
     .WithName("SearchProducts")
     .WithSummary("Search products")
@@ -526,6 +533,28 @@ app.MapPost("/api/admin/search/reindex/{productId:long}", ReindexSingleProductEn
     .WithDescription("Reindexes one product in OpenSearch.")
     .Produces(StatusCodes.Status200OK)
     .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+async Task<IResult> SearchAutocompleteEndpoint(
+    IProductSearchService searchService,
+    string? q = null,
+    int limit = 10)
+{
+    if (string.IsNullOrWhiteSpace(q))
+    {
+        return Results.Ok(new { items = Array.Empty<object>() });
+    }
+
+    try
+    {
+        var query = new ProductAutocompleteQuery(q, Math.Max(1, Math.Min(limit, 50)));
+        var result = await searchService.AutocompleteAsync(query);
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
 
 async Task<IResult> SearchProductsEndpoint(
     IProductSearchService searchService,

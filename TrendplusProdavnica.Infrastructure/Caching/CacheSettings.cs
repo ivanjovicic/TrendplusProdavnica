@@ -28,7 +28,7 @@ namespace TrendplusProdavnica.Infrastructure.Caching
         public TimeSpan EditorialDetail { get; set; } = TimeSpan.FromMinutes(12);
         public TimeSpan EditorialList { get; set; } = TimeSpan.FromMinutes(5);
         public TimeSpan ListingLanding { get; set; } = TimeSpan.FromMinutes(2);
-        public TimeSpan SearchResults { get; set; } = TimeSpan.FromSeconds(45);
+        public TimeSpan SearchResults { get; set; } = TimeSpan.FromSeconds(30);
     }
 
     public sealed class ListingCacheSettings
