@@ -21,5 +21,8 @@ namespace TrendplusProdavnica.Domain.Catalog
         public bool IsActive { get; set; } = true;
         public bool IsVisible { get; set; } = true;
         public int SortOrder { get; set; }
+
+        // Navigation
+        public Product? Product { get; set; }
     }
 }

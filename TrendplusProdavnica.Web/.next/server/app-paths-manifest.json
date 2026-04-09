@@ -1,0 +1,18 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/%5BcategorySlug%5D/page": "app/%5BcategorySlug%5D/page.js",
+  "/brendovi/[slug]/page": "app/brendovi/[slug]/page.js",
+  "/akcija/[categorySlug]/page": "app/akcija/[categorySlug]/page.js",
+  "/checkout/page": "app/checkout/page.js",
+  "/editorial/[slug]/page": "app/editorial/[slug]/page.js",
+  "/kolekcije/[slug]/page": "app/kolekcije/[slug]/page.js",
+  "/korpa/page": "app/korpa/page.js",
+  "/omiljeno/page": "app/omiljeno/page.js",
+  "/page": "app/page.js",
+  "/porudzbina/[orderNumber]/page": "app/porudzbina/[orderNumber]/page.js",
+  "/prodavnice/[slug]/page": "app/prodavnice/[slug]/page.js",
+  "/proizvod/%5Bslug%5D/page": "app/proizvod/%5Bslug%5D/page.js",
+  "/akcija/page": "app/akcija/page.js",
+  "/editorial/page": "app/editorial/page.js",
+  "/prodavnice/page": "app/prodavnice/page.js"
+}

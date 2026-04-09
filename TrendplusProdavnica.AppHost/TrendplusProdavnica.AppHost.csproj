@@ -8,4 +8,12 @@
     <UserSecretsId>dd3cc147-7afe-4042-b72c-368933d5a1f7</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TrendplusProdavnica.Api\TrendplusProdavnica.Api.csproj" />
+  </ItemGroup>
+
 </Project>
