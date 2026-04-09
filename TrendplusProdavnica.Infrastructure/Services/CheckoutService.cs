@@ -53,6 +53,14 @@ public class CheckoutService : ICheckoutService
             return null;
 
         var subtotal = items.Sum(i => i.LineTotal);
+        // NOTE: delivery fee is currently hard-coded here.
+        // PROBLEM: This does not take the customer's selected delivery method into account
+        // (e.g. StorePickup should be free). `PlaceOrderAsync` copies this summary value
+        // into the saved order, so store-pickup orders may be incorrectly charged shipping.
+        // SUGGESTION: Pass the selected `DeliveryMethod` into `GetCheckoutSummaryAsync`
+        // or compute delivery amount in `PlaceOrderAsync` from `request.DeliveryMethod`.
+        // Alternatively, consult a delivery-pricing service or table here instead
+        // of using a fixed value.
         var deliveryAmount = 300m; // V1: default delivery cost (Can be extended)
         var total = subtotal + deliveryAmount;
 
@@ -88,13 +96,15 @@ public class CheckoutService : ICheckoutService
         if (summary == null)
             throw new InvalidOperationException("No se puede procesar el carrito");
 
-        // 3. Generar número de orden
-        var orderNumber = GenerateOrderNumber();
+        // Compute delivery amount according to requested delivery method (avoid charging store pickup)
+        var deliveryAmount = request.DeliveryMethod == DeliveryMethod.StorePickup ? 0m : 300m;
+        summary.DeliveryAmount = deliveryAmount;
+        summary.TotalAmount = summary.SubtotalAmount + deliveryAmount;
 
-        // 4. Crear la orden
+        // 3. Crear la orden (OrderNumber will be assigned after saving to use DB Id for deterministic sequence)
         var order = new Order
         {
-            OrderNumber = orderNumber,
+            // OrderNumber will be set after SaveChanges to use the DB-generated Id
             CartId = cart.Id,
             Status = OrderStatus.PendingPayment,
             Currency = "RSD",
@@ -144,11 +154,16 @@ public class CheckoutService : ICheckoutService
 
         // 6. Guardar en la base de datos
         _context.Orders.Add(order);
+        // Save first to obtain DB-generated Id (used to generate a deterministic order number)
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Generate order number based on DB id to avoid race conditions
+        order.OrderNumber = GenerateOrderNumberFromId(order.Id);
         await _context.SaveChangesAsync(cancellationToken);
 
         return new CheckoutResultDto
         {
-            OrderNumber = orderNumber,
+            OrderNumber = order.OrderNumber,
             TotalAmount = order.TotalAmount,
             Status = order.Status.ToString(),
         };
@@ -207,14 +222,9 @@ public class CheckoutService : ICheckoutService
     /// Genera un número de orden único
     /// Formato: TP-2026-000001
     /// </summary>
-    private string GenerateOrderNumber()
+    private string GenerateOrderNumberFromId(long id)
     {
         var year = DateTime.UtcNow.Year;
-        var lastOrder = _context.Orders
-            .OrderByDescending(o => o.Id)
-            .FirstOrDefault();
-
-        var sequence = (lastOrder?.Id ?? 0) + 1;
-        return $"TP-{year}-{sequence:D6}";
+        return $"TP-{year}-{id:D6}";
     }
 }

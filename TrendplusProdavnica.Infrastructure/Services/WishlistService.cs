@@ -145,12 +145,12 @@ namespace TrendplusProdavnica.Infrastructure.Services
                         .FirstOrDefault(),    
                     Price = x.Product.Variants
                         .Where(v => v.IsActive && v.IsVisible)
-                        .Select(v => v.Price)
-                        .Min(),
+                        .Select(v => (decimal?)v.Price)
+                        .Min() ?? 0m,
                     OldPrice = x.Product.Variants
                         .Where(v => v.IsActive && v.IsVisible && v.OldPrice.HasValue)
-                        .Select(v => v.OldPrice)
-                        .Min(),
+                        .Select(v => (decimal?)v.OldPrice)
+                        .Min() ?? 0m,
                     IsInStock = x.Product.Variants.Any(v => v.IsActive && v.IsVisible && v.TotalStock > 0),
                     AddedAtUtc = x.WishlistItem.AddedAtUtc
                 })
