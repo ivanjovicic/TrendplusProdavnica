@@ -37,6 +37,9 @@ namespace TrendplusProdavnica.Domain.Catalog
         public SeoMetadata? Seo { get; set; }
         public DateTimeOffset? PublishedAtUtc { get; set; }
 
+        // Navigation
+        public Brand? Brand { get; set; }
+
         public IList<ProductVariant> Variants { get; } = new List<ProductVariant>();
         public IList<ProductMedia> Media { get; } = new List<ProductMedia>();
         public IList<ProductCategoryMap> CategoryMaps { get; } = new List<ProductCategoryMap>();

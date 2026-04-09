@@ -61,7 +61,8 @@ namespace TrendplusProdavnica.Application.Catalog.Queries
         decimal? PriceTo = null,
         bool? IsOnSale = null,
         bool? IsNew = null,
-        bool? InStockOnly = null
+        bool? InStockOnly = null,
+        string? CategorySlug = null
     );
 }
 

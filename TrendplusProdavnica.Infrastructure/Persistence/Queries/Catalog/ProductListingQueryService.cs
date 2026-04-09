@@ -33,7 +33,28 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             => BuildListingAsync(ToListingQuery(query), ListingScope.Collection);
 
         public Task<ProductListingPageDto> GetSaleListingAsync(GetSaleListingQuery query)
-            => BuildListingAsync(ToListingQuery(query), ListingScope.Sale);
+        {
+            // If CategorySlug is provided, treat it as a category listing with sale filter
+            if (!string.IsNullOrEmpty(query.CategorySlug))
+            {
+                var categoryQuery = new GetCategoryListingQuery(
+                    query.CategorySlug,
+                    query.Page,
+                    query.PageSize,
+                    query.Sort,
+                    query.Sizes,
+                    query.Colors,
+                    query.Brands,
+                    query.PriceFrom,
+                    query.PriceTo,
+                    IsOnSale: true, // Force sale filter
+                    query.IsNew,
+                    query.InStockOnly);
+                return BuildListingAsync(categoryQuery, ListingScope.Category);
+            }
+
+            return BuildListingAsync(ToListingQuery(query), ListingScope.Sale);
+        }
 
         private static GetCategoryListingQuery ToListingQuery(GetBrandListingQuery query)
             => new(

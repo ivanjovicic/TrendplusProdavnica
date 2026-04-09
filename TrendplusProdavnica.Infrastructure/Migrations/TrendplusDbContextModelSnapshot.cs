@@ -493,6 +493,8 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BrandId");
+
                     b.HasIndex("Slug")
                         .IsUnique()
                         .HasDatabaseName("ux_products_slug");
@@ -1904,6 +1906,215 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.Order", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("CartId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("RSD");
+
+                    b.Property<string>("CustomerFirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CustomerLastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DeliveryAddressLine1")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<string>("DeliveryAddressLine2")
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<decimal>("DeliveryAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("DeliveryCity")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<short>("DeliveryMethod")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("DeliveryPostalCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<short>("PaymentMethod")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("PlacedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ux_orders_order_number");
+
+                    b.ToTable("orders", "sales");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.OrderItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BrandNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<long>("ProductVariantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("SizeEuSnapshot")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("numeric(4,1)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_order_items_order_id");
+
+                    b.ToTable("order_items", "sales");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.Wishlist", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("WishlistToken")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WishlistToken")
+                        .IsUnique();
+
+                    b.ToTable("wishlists", "sales");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.WishlistItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AddedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("WishlistId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WishlistId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("wishlist_items", "sales");
+                });
+
             modelBuilder.Entity("TrendplusProdavnica.Domain.Shared.SlugRedirect", b =>
                 {
                     b.Property<long>("Id")
@@ -2085,6 +2296,12 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.Product", b =>
                 {
+                    b.HasOne("TrendplusProdavnica.Domain.Catalog.Brand", "Brand")
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.OwnsOne("TrendplusProdavnica.Domain.ValueObjects.SeoMetadata", "Seo", b1 =>
                         {
                             b1.Property<long>("ProductId")
@@ -2121,6 +2338,8 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("ProductId");
                         });
+
+                    b.Navigation("Brand");
 
                     b.Navigation("Seo");
                 });
@@ -2181,11 +2400,13 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductVariant", b =>
                 {
-                    b.HasOne("TrendplusProdavnica.Domain.Catalog.Product", null)
+                    b.HasOne("TrendplusProdavnica.Domain.Catalog.Product", "Product")
                         .WithMany("Variants")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.SizeGuideRow", b =>
@@ -2687,11 +2908,35 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TrendplusProdavnica.Domain.Catalog.ProductVariant", null)
+                    b.HasOne("TrendplusProdavnica.Domain.Catalog.ProductVariant", "ProductVariant")
                         .WithMany()
                         .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ProductVariant");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.OrderItem", b =>
+                {
+                    b.HasOne("TrendplusProdavnica.Domain.Sales.Order", "Order")
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.WishlistItem", b =>
+                {
+                    b.HasOne("TrendplusProdavnica.Domain.Sales.Wishlist", "Wishlist")
+                        .WithMany("Items")
+                        .HasForeignKey("WishlistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Wishlist");
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.Brand", b =>
@@ -2765,6 +3010,16 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.Cart", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.Order", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Sales.Wishlist", b =>
                 {
                     b.Navigation("Items");
                 });

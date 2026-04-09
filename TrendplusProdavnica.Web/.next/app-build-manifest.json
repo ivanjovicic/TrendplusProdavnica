@@ -1,0 +1,137 @@
+{
+  "pages": {
+    "/_not-found/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/app/_not-found/page-532c395a65a8acc8.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/css/0fb0dde2a9240375.css",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/layout-eae454cefd7a0b9f.js"
+    ],
+    "/%5BcategorySlug%5D/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/%5BcategorySlug%5D/page-ac3fb8186b62fcca.js"
+    ],
+    "/brendovi/[slug]/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/brendovi/[slug]/page-1e9a8233b0458739.js"
+    ],
+    "/akcija/[categorySlug]/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/akcija/[categorySlug]/page-0b02dd7920c3b5ac.js"
+    ],
+    "/checkout/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/app/checkout/page-baec348003c72b37.js"
+    ],
+    "/editorial/[slug]/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/editorial/[slug]/page-44ad12acb866ac59.js"
+    ],
+    "/kolekcije/[slug]/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/kolekcije/[slug]/page-1e9a8233b0458739.js"
+    ],
+    "/korpa/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/app/korpa/page-eaae4b44cf8e132e.js"
+    ],
+    "/omiljeno/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/omiljeno/page-b6cd07ae6676cf1f.js"
+    ],
+    "/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/page-1e9a8233b0458739.js"
+    ],
+    "/porudzbina/[orderNumber]/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/app/porudzbina/[orderNumber]/page-004b767dfc78cfa6.js"
+    ],
+    "/prodavnice/[slug]/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/prodavnice/[slug]/page-44ad12acb866ac59.js"
+    ],
+    "/proizvod/%5Bslug%5D/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/proizvod/%5Bslug%5D/page-6925279e8ff780e5.js"
+    ],
+    "/akcija/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/akcija/page-1e9a8233b0458739.js"
+    ],
+    "/editorial/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/editorial/page-44ad12acb866ac59.js"
+    ],
+    "/prodavnice/page": [
+      "static/chunks/webpack-4772d34723bd25e0.js",
+      "static/chunks/4bd1b696-c023c6e3521b1417.js",
+      "static/chunks/255-4f212684648fcab9.js",
+      "static/chunks/main-app-0b5d45f6b55af468.js",
+      "static/chunks/619-ba102abea3e3d0e4.js",
+      "static/chunks/app/prodavnice/page-44ad12acb866ac59.js"
+    ]
+  }
+}

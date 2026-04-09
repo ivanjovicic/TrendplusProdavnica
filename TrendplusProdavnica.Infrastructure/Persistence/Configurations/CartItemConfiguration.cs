@@ -45,8 +45,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
                 .HasDatabaseName("ux_cart_items_cart_id_product_variant_id");
 
             // Foreign key to ProductVariant with restrict
-            // Note: ProductVariant navigation not mapped as it's a catalog domain entity
-            builder.HasOne<TrendplusProdavnica.Domain.Catalog.ProductVariant>()
+            builder.HasOne(x => x.ProductVariant)
                 .WithMany()
                 .HasForeignKey(x => x.ProductVariantId)
                 .OnDelete(DeleteBehavior.Restrict);
