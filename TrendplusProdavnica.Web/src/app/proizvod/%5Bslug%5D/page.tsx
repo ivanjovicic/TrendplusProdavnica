@@ -1,23 +1,34 @@
-import { Container, ProductGrid, EmptyState } from '@/components';
+import type { Metadata } from 'next';
+import { ProductDetailsClient } from '@/components/product-details-client';
+import { Breadcrumbs, Container, EmptyState, ProductGrid } from '@/components';
 import { getProductDetail } from '@/lib/api';
-import { AddToCartButton } from '@/components/add-to-cart';
 import { formatPrice } from '@/lib/utils/helpers';
-import Image from 'next/image';
+import { JsonLd, buildMetadata, buildProductJsonLd } from '@/lib/seo';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const { slug } = await params;
     const product = await getProductDetail(slug);
-    return {
-      title: product.seo?.seoTitle || product.name,
-      description: product.seo?.seoDescription || product.shortDescription,
-    };
+
+    return buildMetadata({
+      title: product.name,
+      description: product.shortDescription,
+      path: `/proizvod/${slug}`,
+      seo: product.seo,
+      imageUrl: product.media[0]?.url,
+      type: 'website',
+    });
   } catch {
-    return { title: 'Proizvod' };
+    return buildMetadata({
+      title: 'Proizvod',
+      description: 'Detalj proizvoda.',
+      path: '/proizvod',
+      type: 'website',
+    });
   }
 }
 
@@ -25,72 +36,73 @@ export default async function ProductPage({ params }: PageProps) {
   try {
     const { slug } = await params;
     const product = await getProductDetail(slug);
+    const breadcrumbs = [
+      { label: 'Pocetna', url: '/' },
+      { label: product.categoryName, url: `/kategorije/${product.categorySlug}` },
+      { label: product.name, url: `/proizvod/${product.slug}` },
+    ];
 
     return (
       <div>
         <Container>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
-            {/* Gallery */}
-            <div className="space-y-4">
-              {product.media.filter(m => m.isPrimary).map((media) => (
-                <div key={media.id} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                  <img src={media.url} alt={media.altText} className="w-full h-full object-cover" />
-                </div>
-              ))}
-            </div>
+          <JsonLd data={buildProductJsonLd(product)} />
+          <div className="py-8">
+            <Breadcrumbs items={breadcrumbs} />
 
-            {/* Details */}
-            <div>
-              <h1 className="text-4xl font-bold mb-2">{product.name}</h1>
-              <p className="text-xl text-gray-600 mb-4">{product.brandName}</p>
-              
-              <div className="mb-6">
-                <span className="text-3xl font-bold">{formatPrice(product.price)}</span>
-                {product.oldPrice && (
-                  <span className="ml-4 text-gray-500 line-through">{formatPrice(product.oldPrice)}</span>
-                )}
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+              <div className="space-y-4">
+                {product.media
+                  .filter((media) => media.isPrimary)
+                  .map((media) => (
+                    <div key={media.id} className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+                      <img
+                        src={media.url}
+                        alt={media.altText || product.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
               </div>
 
-              <p className="text-gray-700 mb-6">{product.longDescription || product.shortDescription}</p>
+              <div>
+                <p className="mb-2 text-sm uppercase tracking-wide text-gray-500">{product.brandName}</p>
+                <h1 className="mb-2 text-4xl font-bold">{product.name}</h1>
+                {product.subtitle && <p className="mb-4 text-lg text-gray-600">{product.subtitle}</p>}
 
-              {product.sizes.length > 0 && (
                 <div className="mb-6">
-                  <label className="block text-sm font-semibold mb-2">Veličina</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {product.sizes.map((size) => (
-                      <button
-                        key={size.sku}
-                        className="border rounded py-2 hover:border-black transition-colors"
-                        disabled={!size.isActive}
-                      >
-                        {size.sizeEu}
-                      </button>
-                    ))}
+                  <span className="text-3xl font-bold">{formatPrice(product.price)}</span>
+                  {product.oldPrice && (
+                    <span className="ml-4 text-gray-500 line-through">{formatPrice(product.oldPrice)}</span>
+                  )}
+                </div>
+
+                <p className="mb-6 text-gray-700">{product.longDescription || product.shortDescription}</p>
+
+                <ProductDetailsClient product={product} />
+
+                {product.deliveryInfo && (
+                  <div className="mt-8 rounded bg-blue-50 p-4">
+                    <p className="text-sm text-gray-700">{product.deliveryInfo}</p>
                   </div>
-                </div>
-              )}
-
-              <AddToCartButton variantId={product.sizes[0]?.sku.split('-')[0] as any} />
-
-              {product.deliveryInfo && (
-                <div className="mt-8 p-4 bg-blue-50 rounded">
-                  <p className="text-sm text-gray-700">{product.deliveryInfo}</p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Related Products  */}
           {product.relatedByBrand && product.relatedByBrand.length > 0 && (
-            <div className="py-12 border-t mt-12">
-              <h2 className="text-2xl font-bold mb-6">Više od {product.brandName}</h2>
+            <div className="mt-12 border-t py-12">
+              <h2 className="mb-6 text-2xl font-bold">Vise od brenda {product.brandName}</h2>
               <ProductGrid products={product.relatedByBrand.slice(0, 4)} />
             </div>
           )}
         </Container>
       </div>
     );
-  } catch (error) {
-    return <Container><EmptyState /></Container>;
+  } catch {
+    return (
+      <Container>
+        <EmptyState />
+      </Container>
+    );
   }
 }

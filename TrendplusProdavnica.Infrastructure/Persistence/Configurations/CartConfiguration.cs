@@ -17,6 +17,12 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
                 .IsRequired()
                 .HasMaxLength(36);
 
+            builder.Property(x => x.UserId)
+                .HasMaxLength(128);
+
+            builder.Property(x => x.SessionId)
+                .HasMaxLength(128);
+
             builder.Property(x => x.Status)
                 .HasConversion<short>();
 
@@ -34,6 +40,12 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
 
             builder.HasIndex(x => x.ExpiresAtUtc)
                 .HasDatabaseName("ix_carts_expires_at_utc");
+
+            builder.HasIndex(x => x.SessionId)
+                .HasDatabaseName("ix_carts_session_id");
+
+            builder.HasIndex(x => x.UserId)
+                .HasDatabaseName("ix_carts_user_id");
 
             // Navigation
             builder.HasMany(x => x.Items)

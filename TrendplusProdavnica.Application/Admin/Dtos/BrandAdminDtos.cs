@@ -78,6 +78,7 @@ namespace TrendplusProdavnica.Application.Admin.Dtos
         bool IsFeatured,
         bool IsActive,
         int SortOrder,
+        int ProductCount,
         SeoAdminDto? Seo,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset UpdatedAtUtc);

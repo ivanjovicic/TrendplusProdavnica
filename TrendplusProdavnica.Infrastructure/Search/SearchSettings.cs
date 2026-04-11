@@ -7,6 +7,7 @@ namespace TrendplusProdavnica.Infrastructure.Search
         public int DefaultPageSize { get; set; } = 24;
         public int MaxPageSize { get; set; } = 60;
         public int MaxQueryLength { get; set; } = 120;
+        public int FacetBucketSize { get; set; } = 20;
         public bool RunReindexOnStartup { get; set; }
     }
 }

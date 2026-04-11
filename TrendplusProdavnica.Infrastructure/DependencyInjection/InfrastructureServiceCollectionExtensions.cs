@@ -9,22 +9,42 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenSearch.Client;
 using TrendplusProdavnica.Application.Admin.Services;
+using TrendplusProdavnica.Application.Analytics.Services;
 using TrendplusProdavnica.Application.Catalog.Listing;
 using TrendplusProdavnica.Application.Common.Caching;
 using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Application.Content.Services;
+using TrendplusProdavnica.Application.Content.CategorySeo;
+using TrendplusProdavnica.Application.Experiments.Services;
+using TrendplusProdavnica.Application.Inventory.Services;
+using TrendplusProdavnica.Application.Merchandising.Services;
+using TrendplusProdavnica.Application.Personalization;
+using TrendplusProdavnica.Application.Recommendations.Services;
 using TrendplusProdavnica.Application.Stores.Services;
 using TrendplusProdavnica.Application.Cart.Services;
 using TrendplusProdavnica.Application.Search.Services;
 using TrendplusProdavnica.Application.Wishlist.Services;
 using TrendplusProdavnica.Infrastructure.Admin.Services;
+using TrendplusProdavnica.Infrastructure.Analytics;
 using TrendplusProdavnica.Infrastructure.Caching;
+using TrendplusProdavnica.Infrastructure.Content;
+using TrendplusProdavnica.Infrastructure.Experiments;
+using TrendplusProdavnica.Infrastructure.Inventory;
+using TrendplusProdavnica.Infrastructure.Inventory.Workers;
+using TrendplusProdavnica.Infrastructure.DemandPrediction;
+using TrendplusProdavnica.Infrastructure.Merchandising;
+using TrendplusProdavnica.Infrastructure.Personalization;
+using TrendplusProdavnica.Infrastructure.Recommendations;
 using TrendplusProdavnica.Infrastructure.Persistence.Seeding;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Caching;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Content;
 using TrendplusProdavnica.Infrastructure.Persistence.Queries.Stores;
+using TrendplusProdavnica.Infrastructure.Persistence.Queries.Analytics;
 using TrendplusProdavnica.Infrastructure.Search;
+using TrendplusProdavnica.Infrastructure.Search.Models;
+using TrendplusProdavnica.Infrastructure.Search.Services;
+using TrendplusProdavnica.Infrastructure.Search.Workers;
 using TrendplusProdavnica.Infrastructure.Services;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -107,9 +127,15 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
                 return new OpenSearchClient(connectionSettings);
             });
 
+            services.AddSingleton<ProductSearchQueryBuilder>();
+            services.AddSingleton<ProductSearchFacetBuilder>();
             services.AddScoped<IProductSearchService, OpenSearchProductSearchService>();
             services.AddScoped<IProductSearchIndexService, OpenSearchProductIndexService>();
+            services.AddScoped<IProductSearchIndexer, ProductSearchIndexer>();
+            services.Configure<SearchIndexEventConfig>(configuration.GetSection("SearchIndexing"));
+            services.Configure<SearchIndexSyncWorkerConfig>(configuration.GetSection("SearchIndexingSyncWorker"));
             services.AddHostedService<ProductSearchReindexHostedService>();
+            services.AddHostedService<ProductSearchIndexSyncWorker>();
 
             return services;
         }
@@ -120,6 +146,11 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
             services.TryAddSingleton<IWebshopCacheKeys, NoOpWebshopCacheKeys>();
             services.TryAddSingleton<IWebshopCacheInvalidationService, NoOpWebshopCacheInvalidationService>();
 
+            if (!services.Any(descriptor => descriptor.ServiceType == typeof(IFusionCache)))
+            {
+                services.AddFusionCache();
+            }
+
             services.AddScoped<HomePageQueryService>();
             services.AddScoped<ProductListingQueryService>();
             services.AddScoped<ProductDetailQueryService>();
@@ -129,7 +160,7 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
             services.AddScoped<StoreQueryService>();
 
             services.AddScoped<IHomePageQueryService, CachedHomePageQueryService>();
-            services.AddScoped<IProductListingQueryService, CachedProductListingQueryService>();
+            services.AddScoped<IProductListingQueryService, ProductListingQueryService>();
             services.AddScoped<IProductListingReadService, ProductListingReadService>();
             services.AddScoped<IProductDetailQueryService, CachedProductDetailQueryService>();
             services.AddScoped<IBrandPageQueryService, CachedBrandPageQueryService>();
@@ -150,6 +181,11 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
 
         public static IServiceCollection AddAdminServices(this IServiceCollection services)
         {
+            // Admin services (using Infrastructure implementation)
+            services.AddScoped<IAdminAuthService, AdminAuthService>();
+            services.AddScoped<IOrderAdminService, OrderAdminService>();
+
+            // Existing admin services
             services.AddScoped<IBrandAdminService, BrandAdminService>();
             services.AddScoped<ICollectionAdminService, CollectionAdminService>();
             services.AddScoped<IProductAdminService, ProductAdminService>();
@@ -169,6 +205,90 @@ namespace TrendplusProdavnica.Infrastructure.DependencyInjection
         public static IServiceCollection AddWishlistServices(this IServiceCollection services)
         {
             services.AddScoped<IWishlistService, WishlistService>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddInventoryServices(this IServiceCollection services, IConfiguration configuration)
+        {
+            // Disabled - InventoryService temporarily disabled due to missing StoreInventories DbSet
+            // services.AddScoped<IInventoryService, InventoryService>();
+            // services.Configure<InventorySyncWorkerConfig>(configuration.GetSection("InventorySyncWorker"));
+            // Disabled - InventorySyncWorker depends on disabled InventoryService
+            // services.AddHostedService<InventorySyncWorker>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddRecommendationServices(this IServiceCollection services)
+        {
+            // Disabled - RecommendationService temporarily disabled due to IFusionCache API incompatibilities
+            // services.AddScoped<IRecommendationService, RecommendationService>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddMerchandisingServices(this IServiceCollection services)
+        {
+            services.AddScoped<IMerchandisingService, MerchandisingService>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddCategorySeoServices(this IServiceCollection services)
+        {
+            services.AddScoped<ICategorySeoContentService, CategorySeoContentService>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddAnalyticsServices(this IServiceCollection services)
+        {
+            services.AddScoped<IAnalyticsService, AnalyticsService>();
+            services.AddScoped<IDemandPredictionService, DemandPredictionService>();
+            services.AddScoped<DemandPredictionQueries>();
+
+            return services;
+        }
+
+        public static IServiceCollection AddExperimentServices(this IServiceCollection services)
+        {
+            services.AddScoped<IExperimentService, ExperimentService>();
+
+            return services;
+        }
+
+        // Note: The following services are placeholders / not yet implemented
+        // public static IServiceCollection AddStoresServices(this IServiceCollection services)
+        // public static IServiceCollection AddSearchServices(this IServiceCollection services)
+        // public static IServiceCollection AddCachingServices(this IServiceCollection services)
+        // public static IServiceCollection AddContentServices(this IServiceCollection services)
+
+        // public static IServiceCollection AddPersonalizationServices(this IServiceCollection services)
+        // {
+        //     services.AddScoped<IPersonalizationService, PersonalizationService>();
+        //
+        //     return services;
+        // }
+        //
+        // public static IServiceCollection AddRecommendationsServices(this IServiceCollection services)
+        // {
+        //     services.AddScoped<IRecommendationService, RecommendationService>();
+        //
+        //     return services;
+        // }
+
+        public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
+        {
+            services
+                .AddAdminServices()
+                .AddAnalyticsServices()
+                .AddExperimentServices()
+                .AddInventoryServices(configuration)
+                .AddMerchandisingServices()
+                // .AddPersonalizationServices()  // Disabled: PersonalizationService wrapped with #if false
+                // .AddRecommendationsServices();  // Disabled: RecommendationService wrapped with #if false
+                ;
 
             return services;
         }

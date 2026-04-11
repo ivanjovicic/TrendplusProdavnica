@@ -14,6 +14,7 @@ namespace TrendplusProdavnica.Application.Catalog.Listing
         IReadOnlyList<long>? Brands,
         bool? IsOnSale,
         bool? IsNew,
+        bool? InStockOnly,
         int Page = 1,
         int PageSize = 24,
         string? Sort = "popular");

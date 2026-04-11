@@ -75,7 +75,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
                 {
                     SeoTitle = $"{seed.Name} zenska obuca - Trendplus",
                     SeoDescription = seed.ShortDescription,
-                    CanonicalUrl = $"/brend/{seed.Slug}"
+                    CanonicalUrl = $"/brendovi/{seed.Slug}"
                 };
                 brand.UpdatedAtUtc = now;
             }
@@ -119,7 +119,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
                 {
                     SeoTitle = $"{seed.Name} - Trendplus",
                     SeoDescription = seed.ShortDescription,
-                    CanonicalUrl = $"/kolekcija/{seed.Slug}"
+                    CanonicalUrl = $"/kolekcije/{seed.Slug}"
                 };
                 collection.UpdatedAtUtc = now;
             }
@@ -207,8 +207,10 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
             await UpsertProductMediaAsync(productSeeds, products, cancellationToken);
             await UpsertRelatedProductsAsync(productSeeds, products, now, cancellationToken);
             await UpsertProductCollectionMappingsAsync(productSeeds, products, now, cancellationToken);
+            await UpsertProductReviewsAsync(productSeeds, products, now, cancellationToken);
+            await UpsertProductRatingsAsync(products, now, cancellationToken);
 
-            _logger.LogInformation("Products, variants and catalog mappings seeded.");
+            _logger.LogInformation("Products, variants, reviews and catalog mappings seeded.");
         }
 
         public async Task SeedStoresAsync(CancellationToken cancellationToken = default)

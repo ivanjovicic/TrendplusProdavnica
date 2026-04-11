@@ -3,11 +3,16 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using TrendplusProdavnica.Domain.Catalog;
 using TrendplusProdavnica.Domain.Content;
+using TrendplusProdavnica.Domain.Analytics;
 using TrendplusProdavnica.Domain.Enums;
+using TrendplusProdavnica.Domain.Experiments;
 using TrendplusProdavnica.Domain.Inventory;
+using TrendplusProdavnica.Domain.Merchandising;
+using TrendplusProdavnica.Domain.Personalization;
 using TrendplusProdavnica.Domain.Pricing;
 using TrendplusProdavnica.Domain.Shared;
 using TrendplusProdavnica.Domain.Sales;
+using TrendplusProdavnica.Domain.Search;
 
 namespace TrendplusProdavnica.Infrastructure.Persistence
 {
@@ -25,6 +30,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence
         public DbSet<Product> Products { get; set; } = null!;
         public DbSet<ProductVariant> ProductVariants { get; set; } = null!;
         public DbSet<ProductMedia> ProductMedia { get; set; } = null!;
+        public DbSet<ProductReview> ProductReviews { get; set; } = null!;
+        public DbSet<ProductRating> ProductRatings { get; set; } = null!;
         public DbSet<ProductCategoryMap> ProductCategoryMaps { get; set; } = null!;
         public DbSet<ProductCollectionMap> ProductCollectionMaps { get; set; } = null!;
         public DbSet<ProductRelatedProduct> ProductRelatedProducts { get; set; } = null!;
@@ -37,6 +44,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence
         public DbSet<PromotionCategory> PromotionCategories { get; set; } = null!;
         public DbSet<PromotionBrand> PromotionBrands { get; set; } = null!;
         public DbSet<PromotionCollection> PromotionCollections { get; set; } = null!;
+
+        public DbSet<MerchandisingRule> MerchandisingRules { get; set; } = null!;
 
         public DbSet<SiteSettings> SiteSettings { get; set; } = null!;
         public DbSet<NavigationMenu> NavigationMenus { get; set; } = null!;
@@ -60,6 +69,17 @@ namespace TrendplusProdavnica.Infrastructure.Persistence
 
         public DbSet<Wishlist> Wishlists { get; set; } = null!;
         public DbSet<WishlistItem> WishlistItems { get; set; } = null!;
+
+        public DbSet<SearchIndexEventLog> SearchIndexEventLogs { get; set; } = null!;
+
+        public DbSet<CategorySeoContent> CategorySeoContents { get; set; } = null!;
+
+        public DbSet<AnalyticsEvent> AnalyticsEvents { get; set; } = null!;
+
+        public DbSet<Experiment> Experiments { get; set; } = null!;
+        public DbSet<ExperimentAssignment> ExperimentAssignments { get; set; } = null!;
+
+        public DbSet<UserProfile> UserProfiles { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

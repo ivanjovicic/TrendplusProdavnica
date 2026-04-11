@@ -27,21 +27,27 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             var product = await (
                 from entity in _db.Products.AsNoTracking()
                 join brand in _db.Brands.AsNoTracking() on entity.BrandId equals brand.Id
+                join category in _db.Categories.AsNoTracking() on entity.PrimaryCategoryId equals category.Id
                 where entity.Slug == query.Slug &&
                       entity.Status == ProductStatus.Published &&
                       entity.IsVisible
                 select new ProductHeaderProjection(
                     entity.Id,
                     entity.Slug,
+                    entity.BrandId,
+                    brand.Slug,
+                    brand.Name,
+                    entity.PrimaryCategoryId,
+                    category.Slug,
+                    category.Name,
                     entity.Name,
                     entity.Subtitle,
                     entity.ShortDescription,
                     entity.LongDescription,
+                    entity.PrimaryColorName,
                     entity.IsNew,
                     entity.IsBestseller,
-                    entity.PrimaryCategoryId,
                     entity.SizeGuideId,
-                    brand.Name,
                     entity.Seo))
                 .FirstOrDefaultAsync();
 
@@ -59,13 +65,18 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 .ThenBy(variant => variant.SizeEu)
                 .Select(variant => new VariantProjection(
                     variant.Id,
+                    variant.Sku,
+                    variant.Barcode,
                     variant.SizeEu,
+                    variant.SortOrder,
                     variant.Price,
                     variant.OldPrice,
                     variant.Currency,
                     variant.StockStatus,
                     variant.TotalStock,
-                    variant.LowStockThreshold))
+                    variant.LowStockThreshold,
+                    variant.IsActive,
+                    variant.IsVisible))
                 .ToArrayAsync();
 
             if (variants.Length == 0)
@@ -79,6 +90,9 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 .ThenByDescending(item => item.IsPrimary)
                 .ThenBy(item => item.Id)
                 .Select(item => new ProductMediaProjection(
+                    item.Id,
+                    item.ProductId,
+                    item.VariantId,
                     item.Url,
                     item.MobileUrl,
                     item.AltText,
@@ -86,11 +100,17 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                     item.MediaType,
                     item.MediaRole,
                     item.SortOrder,
-                    item.IsPrimary))
+                    item.IsPrimary,
+                    item.IsActive))
                 .ToArrayAsync();
 
             var summaryPrice = variants.Min(variant => variant.Price);
             var summaryOldPrice = ResolveSummaryOldPrice(variants);
+            var primaryVariant = variants
+                .OrderByDescending(variant => variant.TotalStock > 0)
+                .ThenBy(variant => variant.SortOrder)
+                .ThenBy(variant => variant.SizeEu)
+                .First();
             var currency = variants
                 .Select(variant => variant.Currency)
                 .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
@@ -115,18 +135,64 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             var sizeGuide = await BuildSizeGuideAsync(product.SizeGuideId);
             var trustInfo = await BuildTrustInfoAsync();
             var seo = ProductQueryMappingHelper.MapSeo(product.Seo, product.Name, product.ShortDescription);
+            var rating = await _db.ProductRatings.AsNoTracking()
+                .Where(item => item.ProductId == product.Id)
+                .Select(item => new ProductRatingProjection(
+                    item.AverageRating,
+                    item.ReviewCount,
+                    item.RatingCount))
+                .FirstOrDefaultAsync();
+            var reviews = await _db.ProductReviews.AsNoTracking()
+                .Where(item =>
+                    item.ProductId == product.Id &&
+                    item.Status == ProductReviewStatus.Published &&
+                    item.PublishedAtUtc.HasValue)
+                .OrderByDescending(item => item.PublishedAtUtc)
+                .ThenByDescending(item => item.UpdatedAtUtc)
+                .ThenByDescending(item => item.Id)
+                .Take(6)
+                .Select(item => new ProductReviewProjection(
+                    item.AuthorName,
+                    item.Title,
+                    item.ReviewBody,
+                    item.RatingValue,
+                    item.PublishedAtUtc))
+                .ToArrayAsync();
+            var aggregateRating = rating is null
+                ? null
+                : new ProductAggregateRatingDto(
+                    rating.AverageRating,
+                    rating.ReviewCount,
+                    rating.RatingCount,
+                    5m,
+                    1m);
 
             return new ProductDetailDto(
                 product.Id,
                 product.Slug,
+                product.BrandId,
+                product.BrandSlug,
                 product.BrandName,
+                product.PrimaryCategoryId,
+                product.CategorySlug,
+                product.CategoryName,
                 product.Name,
                 product.Subtitle,
                 product.ShortDescription,
                 product.LongDescription,
+                product.PrimaryColorName,
+                null,
+                product.SizeGuideId,
+                primaryVariant.Sku,
+                null,
+                null,
+                primaryVariant.Barcode,
                 summaryPrice,
                 summaryOldPrice,
                 currency,
+                product.IsNew,
+                product.IsBestseller,
+                hasSale,
                 ProductQueryMappingHelper.BuildBadges(product.IsNew, product.IsBestseller, hasSale),
                 breadcrumbs,
                 media.Select(MapMedia).ToArray(),
@@ -134,10 +200,25 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 storeAvailability,
                 relatedProducts,
                 similarProducts,
+                relatedProducts,
+                similarProducts,
                 seo,
                 trustInfo.DeliveryInfo,
                 trustInfo.ReturnInfo,
-                sizeGuide);
+                null,
+                sizeGuide,
+                aggregateRating,
+                rating?.AverageRating,
+                rating?.ReviewCount,
+                rating?.RatingCount,
+                reviews
+                    .Select(review => new ProductReviewDto(
+                        review.AuthorName,
+                        review.Title,
+                        review.ReviewBody,
+                        review.RatingValue,
+                        review.PublishedAtUtc))
+                    .ToArray());
         }
 
         private async Task<ProductCardDto[]> LoadRelatedProductCardsAsync(
@@ -324,7 +405,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
                 categoryChain.Reverse();
                 breadcrumbs.AddRange(categoryChain.Select(item =>
-                    new BreadcrumbItemDto(item.Name, $"/kategorija/{item.Slug}")));
+                    new BreadcrumbItemDto(item.Name, $"/{item.Slug}")));
             }
 
             breadcrumbs.Add(new BreadcrumbItemDto(productName, $"/proizvod/{productSlug}"));
@@ -334,14 +415,18 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
         private static ProductMediaDto MapMedia(ProductMediaProjection media)
         {
             return new ProductMediaDto(
+                media.Id,
+                media.ProductId,
+                media.VariantId,
                 media.Url,
                 media.MobileUrl,
                 media.AltText,
                 media.Title,
-                media.MediaType.ToString().ToLowerInvariant(),
-                media.MediaRole.ToString().ToLowerInvariant(),
+                (int)media.MediaType,
+                (int)media.MediaRole,
                 media.SortOrder,
-                media.IsPrimary);
+                media.IsPrimary,
+                media.IsActive);
         }
 
         private static ProductSizeOptionDto MapSizeOption(VariantProjection variant)
@@ -350,11 +435,18 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 variant.Id,
                 variant.SizeEu,
                 variant.SizeEu.ToString("0.#", CultureInfo.InvariantCulture),
+                variant.Sku,
+                variant.Barcode,
+                variant.IsActive,
+                variant.IsVisible,
                 variant.TotalStock > 0,
                 variant.StockStatus == StockStatus.LowStock || variant.TotalStock <= variant.LowStockThreshold,
                 variant.TotalStock,
+                (int)variant.StockStatus,
+                variant.LowStockThreshold,
                 variant.Price,
-                variant.OldPrice);
+                variant.OldPrice,
+                variant.Currency);
         }
 
         private static decimal? ResolveSummaryOldPrice(IEnumerable<VariantProjection> variants)
@@ -380,28 +472,41 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
         private sealed record ProductHeaderProjection(
             long Id,
             string Slug,
+            long BrandId,
+            string BrandSlug,
+            string BrandName,
+            long PrimaryCategoryId,
+            string CategorySlug,
+            string CategoryName,
             string Name,
             string? Subtitle,
             string ShortDescription,
             string? LongDescription,
+            string? PrimaryColorName,
             bool IsNew,
             bool IsBestseller,
-            long PrimaryCategoryId,
             long? SizeGuideId,
-            string BrandName,
             Domain.ValueObjects.SeoMetadata? Seo);
 
         private sealed record VariantProjection(
             long Id,
+            string Sku,
+            string? Barcode,
             decimal SizeEu,
+            int SortOrder,
             decimal Price,
             decimal? OldPrice,
             string Currency,
             StockStatus StockStatus,
             int TotalStock,
-            int LowStockThreshold);
+            int LowStockThreshold,
+            bool IsActive,
+            bool IsVisible);
 
         private sealed record ProductMediaProjection(
+            long Id,
+            long ProductId,
+            long? VariantId,
             string Url,
             string? MobileUrl,
             string? AltText,
@@ -409,7 +514,20 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             MediaType MediaType,
             MediaRole MediaRole,
             int SortOrder,
-            bool IsPrimary);
+            bool IsPrimary,
+            bool IsActive);
+
+        private sealed record ProductRatingProjection(
+            decimal AverageRating,
+            int ReviewCount,
+            int RatingCount);
+
+        private sealed record ProductReviewProjection(
+            string AuthorName,
+            string? Title,
+            string? ReviewBody,
+            decimal RatingValue,
+            DateTimeOffset? PublishedAtUtc);
 
         private sealed record StoreAvailabilityItemDto(
             string StoreName,

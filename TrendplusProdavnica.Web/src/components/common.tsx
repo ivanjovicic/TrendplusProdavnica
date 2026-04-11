@@ -1,25 +1,32 @@
 import Link from 'next/link';
 import type { BreadcrumbItemDto } from '@/lib/types';
+import { JsonLd, buildBreadcrumbListJsonLd } from '@/lib/seo';
 
 interface BreadcrumbsProps {
   items: BreadcrumbItemDto[];
 }
 
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
+  const normalizedItems = items.filter((item) => item.label && item.url);
+
   return (
-    <nav className="flex text-sm gap-2 mb-6">
-      {items.map((item, idx) => (
-        <div key={item.slug} className="flex items-center gap-2">
-          {idx > 0 && <span className="text-gray-400">/</span>}
-          {idx === items.length - 1 ? (
-            <span className="text-gray-900 font-semibold">{item.label}</span>
-          ) : (
-            <Link href={item.url} className="text-blue-600 hover:underline">
-              {item.label}
-            </Link>
-          )}
-        </div>
-      ))}</nav>
+    <>
+      <nav aria-label="Breadcrumb" className="flex flex-wrap text-sm gap-2 mb-6">
+        {normalizedItems.map((item, idx) => (
+          <div key={`${item.url}-${idx}`} className="flex items-center gap-2">
+            {idx > 0 && <span className="text-gray-400">/</span>}
+            {idx === normalizedItems.length - 1 ? (
+              <span className="text-gray-900 font-semibold">{item.label}</span>
+            ) : (
+              <Link href={item.url} className="text-blue-600 hover:underline">
+                {item.label}
+              </Link>
+            )}
+          </div>
+        ))}
+      </nav>
+      {normalizedItems.length > 0 && <JsonLd data={buildBreadcrumbListJsonLd(normalizedItems)} />}
+    </>
   );
 }
 

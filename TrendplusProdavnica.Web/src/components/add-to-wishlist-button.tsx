@@ -26,21 +26,18 @@ export function AddToWishlistButton({
     try {
       let token = getWishlistToken();
 
-      // Create new wishlist if doesn't exist
       if (!token) {
         const newWishlist = await wishlistApi.createWishlist();
         token = newWishlist.wishlistToken;
         setWishlistToken(token);
       }
 
-      // Add item
       await wishlistApi.addToWishlist(token, { productId });
       setIsAdded(true);
 
-      // Reset after 2 seconds
       setTimeout(() => setIsAdded(false), 2000);
     } catch (err: any) {
-      setError(err.message || 'Не могу да додам у листу');
+      setError(err.message || 'Ne mogu da dodam u listu zelja');
       console.error(err);
     } finally {
       setLoading(false);
@@ -56,13 +53,13 @@ export function AddToWishlistButton({
           inline-flex items-center justify-center gap-2
           transition-colors duration-200
           ${isAdded ? 'text-red-600' : 'text-gray-600 hover:text-red-600'}
-          disabled:opacity-50 disabled:cursor-not-allowed
+          disabled:cursor-not-allowed disabled:opacity-50
           ${className}
         `}
-        title={isAdded ? 'Додано у листу!' : 'Додај у листу жеља'}
+        title={isAdded ? 'Dodano u listu zelja!' : 'Dodaj u listu zelja'}
       >
         <svg
-          className={`w-5 h-5 ${isAdded ? 'fill-current' : ''}`}
+          className={`h-5 w-5 ${isAdded ? 'fill-current' : ''}`}
           fill={isAdded ? 'currentColor' : 'none'}
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -74,13 +71,9 @@ export function AddToWishlistButton({
             d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
           />
         </svg>
-        {showText && (
-          <span className="text-sm font-medium">
-            {isAdded ? 'Додано!' : 'Жеље'}
-          </span>
-        )}
+        {showText && <span className="text-sm font-medium">{isAdded ? 'Dodano!' : 'Zelje'}</span>}
       </button>
-      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }

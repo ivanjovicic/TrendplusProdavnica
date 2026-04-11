@@ -1,0 +1,279 @@
+// Example implementation in ProductAdminService or similar
+
+using TrendplusProdavnica.Application.Search.Services;
+
+public class ProductAdminService : IProductAdminService
+{
+    private readonly TrendplusDbContext _db;
+    private readonly IProductSearchIndexer _searchIndexer;
+    private readonly ILogger<ProductAdminService> _logger;
+
+    public ProductAdminService(
+        TrendplusDbContext db,
+        IProductSearchIndexer searchIndexer,
+        ILogger<ProductAdminService> logger)
+    {
+        _db = db;
+        _searchIndexer = searchIndexer;
+        _logger = logger;
+    }
+
+    // ===========================
+    // CREATE
+    // ===========================
+
+    public async Task CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken = default)
+    {
+        // ... validation ...
+
+        var product = new Product(
+            request.Name,
+            request.Slug,
+            request.BrandId,
+            request.PrimaryCategoryId);
+
+        _db.Products.Add(product);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Product '{ProductName}' created with ID {ProductId}", product.Name, product.Id);
+
+        // Queue for search indexing
+        await _searchIndexer.QueueProductAsync(
+            product.Id,
+            SearchIndexEventType.ProductCreated,
+            cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} queued for search indexing", product.Id);
+    }
+
+    // ===========================
+    // UPDATE
+    // ===========================
+
+    public async Task UpdateProductAsync(
+        long productId,
+        UpdateProductRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var product = await _db.Products.FindAsync(new object[] { productId }, cancellationToken: cancellationToken);
+
+        if (product == null)
+        {
+            throw new InvalidOperationException($"Product {productId} not found");
+        }
+
+        // Update properties
+        product.UpdateName(request.Name);
+        product.UpdateDescription(request.Description);
+        // ... more updates ...
+
+        _db.Products.Update(product);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} updated", productId);
+
+        // Queue for search indexing
+        await _searchIndexer.QueueProductAsync(
+            productId,
+            SearchIndexEventType.ProductUpdated,
+            cancellationToken);
+    }
+
+    // ===========================
+    // UPDATE PRICE
+    // ===========================
+
+    public async Task UpdateProductPriceAsync(
+        long productId,
+        long variantId,
+        decimal newPrice,
+        CancellationToken cancellationToken = default)
+    {
+        var variant = await _db.ProductVariants
+            .FirstOrDefaultAsync(v => v.Id == variantId && v.ProductId == productId, cancellationToken);
+
+        if (variant == null)
+        {
+            throw new InvalidOperationException($"Variant {variantId} not found for product {productId}");
+        }
+
+        variant.UpdatePrice(newPrice);
+        _db.ProductVariants.Update(variant);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} variant {VariantId} price updated to {Price}", 
+            productId, variantId, newPrice);
+
+        // Queue for search indexing (price changed is a specific event)
+        await _searchIndexer.QueueProductAsync(
+            productId,
+            SearchIndexEventType.ProductPriceChanged,
+            cancellationToken);
+    }
+
+    // ===========================
+    // DELETE
+    // ===========================
+
+    public async Task DeleteProductAsync(long productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _db.Products.FindAsync(new object[] { productId }, cancellationToken: cancellationToken);
+
+        if (product == null)
+        {
+            throw new InvalidOperationException($"Product {productId} not found");
+        }
+
+        _db.Products.Remove(product);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} deleted", productId);
+
+        // Queue for deletion from search index
+        await _searchIndexer.QueueProductAsync(
+            productId,
+            SearchIndexEventType.ProductDeleted,
+            cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} queued for delete from search index", productId);
+    }
+
+    // ===========================
+    // PUBLISH/UNPUBLISH
+    // ===========================
+
+    public async Task PublishProductAsync(long productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _db.Products.FindAsync(new object[] { productId }, cancellationToken: cancellationToken);
+
+        if (product == null)
+        {
+            throw new InvalidOperationException($"Product {productId} not found");
+        }
+
+        product.Publish();
+        _db.Products.Update(product);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} published", productId);
+
+        // Queue for indexing (was not searchable, now is)
+        await _searchIndexer.QueueProductAsync(
+            productId,
+            SearchIndexEventType.ProductUpdated,
+            cancellationToken);
+    }
+
+    public async Task UnpublishProductAsync(long productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _db.Products.FindAsync(new object[] { productId }, cancellationToken: cancellationToken);
+
+        if (product == null)
+        {
+            throw new InvalidOperationException($"Product {productId} not found");
+        }
+
+        product.Unpublish();
+        _db.Products.Update(product);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Product {ProductId} unpublished", productId);
+
+        // Queue for deletion from search index (no longer searchable)
+        await _searchIndexer.QueueProductAsync(
+            productId,
+            SearchIndexEventType.ProductDeleted,
+            cancellationToken);
+    }
+
+    // ===========================
+    // BULK OPERATIONS
+    // ===========================
+
+    public async Task UpdateMultipleProductsAsync(
+        long[] productIds,
+        BulkUpdateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var productId in productIds)
+        {
+            var product = await _db.Products.FindAsync(new object[] { productId }, cancellationToken: cancellationToken);
+
+            if (product != null)
+            {
+                // Apply bulk updates
+                if (!string.IsNullOrEmpty(request.NewCategory))
+                {
+                    product.UpdateCategory(request.NewCategory);
+                }
+
+                _db.Products.Update(product);
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Bulk updated {Count} products", productIds.Length);
+
+        // Queue ALL products for reindexing as a batch
+        await _searchIndexer.QueueProductsAsync(
+            productIds,
+            SearchIndexEventType.ProductUpdated,
+            cancellationToken);
+
+        _logger.LogInformation("Bulk queued {Count} products for search reindexing", productIds.Length);
+    }
+}
+
+// ===========================
+// Alternative: Inventory Service Example
+// ===========================
+
+public class InventoryService
+{
+    private readonly TrendplusDbContext _db;
+    private readonly IProductSearchIndexer _searchIndexer;
+    private readonly ILogger<InventoryService> _logger;
+
+    public async Task UpdateInventoryAsync(
+        long productId,
+        long variantId,
+        int newQuantity,
+        CancellationToken cancellationToken = default)
+    {
+        var variant = await _db.ProductVariants
+            .FirstOrDefaultAsync(v => v.Id == variantId && v.ProductId == productId, cancellationToken);
+
+        if (variant == null)
+        {
+            throw new InvalidOperationException($"Variant not found");
+        }
+
+        // Update stock
+        variant.UpdateStock(newQuantity);
+        _db.ProductVariants.Update(variant);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Inventory updated - Product {ProductId}, Variant {VariantId}, New Qty {Quantity}",
+            productId, variantId, newQuantity);
+
+        // Queue for search reindexing (in-stock status changed)
+        await _searchIndexer.QueueProductAsync(
+            productId,
+            SearchIndexEventType.InventoryChanged,
+            cancellationToken);
+    }
+}
+
+// ===========================
+// DEPENDENCY INJECTION
+// ===========================
+
+// In Program.cs or RegisterServices:
+services.AddScoped<IProductAdminService, ProductAdminService>();
+services.AddScoped<IProductSearchIndexer, ProductSearchIndexer>();
+
+// Already registered in InfrastructureServiceCollectionExtensions:
+// services.Configure<SearchIndexEventConfig>(configuration.GetSection("SearchIndexing"));
+// services.AddHostedService<ProductSearchIndexSyncWorker>();

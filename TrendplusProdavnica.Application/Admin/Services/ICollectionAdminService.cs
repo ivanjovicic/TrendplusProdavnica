@@ -11,8 +11,8 @@ namespace TrendplusProdavnica.Application.Admin.Services
         Task<IReadOnlyList<CollectionAdminDto>> GetListAsync(CancellationToken cancellationToken = default);
         Task<CollectionAdminDto> GetByIdAsync(long id, CancellationToken cancellationToken = default);
         Task<CollectionAdminDto> GetBySlugAsync(string slug, CancellationToken cancellationToken = default);
-        Task<CollectionAdminDto> CreateAsync(CreateCollectionRequest request, CancellationToken cancellationToken = default);
-        Task<CollectionAdminDto> UpdateAsync(long id, UpdateCollectionRequest request, CancellationToken cancellationToken = default);
+        Task<CollectionAdminDto> CreateAsync(TrendplusProdavnica.Application.Admin.Dtos.CreateCollectionRequest request, CancellationToken cancellationToken = default);
+        Task<CollectionAdminDto> UpdateAsync(long id, TrendplusProdavnica.Application.Admin.Dtos.UpdateCollectionRequest request, CancellationToken cancellationToken = default);
         Task<CollectionAdminDto> ArchiveAsync(long id, CancellationToken cancellationToken = default);
         Task<CollectionAdminDto> UnarchiveAsync(long id, CancellationToken cancellationToken = default);
     }

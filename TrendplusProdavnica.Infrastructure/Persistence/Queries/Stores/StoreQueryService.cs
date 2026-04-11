@@ -183,7 +183,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Stores
                 .Select(item =>
                 {
                     var brand = brandById[item.BrandId];
-                    return new BreadcrumbItemDto(brand.Name, $"/brend/{brand.Slug}");
+                    return new BreadcrumbItemDto(brand.Name, $"/brendovi/{brand.Slug}");
                 })
                 .ToArray();
         }
@@ -241,7 +241,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Stores
                 .Select(item =>
                 {
                     var category = categoryById[item.CategoryId];
-                    return new BreadcrumbItemDto(category.Name, $"/kategorija/{category.Slug}");
+                    return new BreadcrumbItemDto(category.Name, $"/{category.Slug}");
                 })
                 .ToArray();
         }

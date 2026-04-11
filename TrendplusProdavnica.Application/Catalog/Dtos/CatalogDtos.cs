@@ -7,25 +7,36 @@ namespace TrendplusProdavnica.Application.Catalog.Dtos
     public record BreadcrumbItemDto(string Label, string Url);
 
     public record ProductMediaDto(
+        long Id,
+        long ProductId,
+        long? VariantId,
         string Url,
         string? MobileUrl,
         string? AltText,
         string? Title,
-        string MediaType,
-        string MediaRole,
+        int MediaType,
+        int MediaRole,
         int SortOrder,
-        bool IsPrimary
+        bool IsPrimary,
+        bool IsActive
     );
 
     public record ProductSizeOptionDto(
         long VariantId,
         decimal SizeEu,
         string Label,
+        string Sku,
+        string? Barcode,
+        bool IsActive,
+        bool IsVisible,
         bool IsInStock,
         bool IsLowStock,
         int TotalStock,
+        int StockStatus,
+        int LowStockThreshold,
         decimal Price,
-        decimal? OldPrice
+        decimal? OldPrice,
+        string Currency
     );
 
     public record ProductCardDto(
@@ -41,7 +52,10 @@ namespace TrendplusProdavnica.Application.Catalog.Dtos
         string[] Badges,
         bool IsInStock,
         int AvailableSizesCount,
-        string? ColorLabel
+        string? ColorLabel,
+        bool IsNew,
+        bool IsBestseller,
+        bool IsOnSale
     );
 
     public record PaginationDto(int Page, int PageSize, long TotalItems)
@@ -58,7 +72,17 @@ namespace TrendplusProdavnica.Application.Catalog.Dtos
     /// <summary>
     /// SEO metadata DTO
     /// </summary>
-    public record SeoDto(string Title, string Description, string? CanonicalUrl, string[]? Keywords);
+    public record SeoDto(
+        string SeoTitle,
+        string SeoDescription,
+        string? CanonicalUrl,
+        string[]? Keywords,
+        string? RobotsDirective = null,
+        string? OgTitle = null,
+        string? OgDescription = null,
+        string? OgImageUrl = null,
+        string? StructuredDataOverrideJson = null,
+        Dictionary<string, string>? AlternateLanguageUrls = null);
 
     /// <summary>
     /// Category card for home page and dynamic listings

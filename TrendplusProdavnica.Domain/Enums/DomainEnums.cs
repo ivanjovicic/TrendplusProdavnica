@@ -52,6 +52,13 @@ namespace TrendplusProdavnica.Domain.Enums
         Recommended = 3
     }
 
+    public enum ProductReviewStatus : short
+    {
+        Pending = 0,
+        Published = 1,
+        Hidden = 2
+    }
+
     public enum PromotionDiscountType : short
     {
         Percent = 1,

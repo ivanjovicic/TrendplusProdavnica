@@ -79,7 +79,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Content
                     .ThenBy(category => category.Name)
                     .Select(category => new BreadcrumbItemDto(
                         category.Name,
-                        $"/kategorija/{category.Slug}"))
+                        $"/{category.Slug}"))
                     .ToArrayAsync();
 
             var introText = content?.IntroText ?? brand.LongDescription ?? brand.ShortDescription ?? string.Empty;

@@ -14,6 +14,7 @@ namespace TrendplusProdavnica.Application.Catalog.Listing
         string? SecondaryImageUrl,
         int AvailableSizesCount,
         bool IsNew,
+        bool IsBestseller,
         bool IsOnSale,
         string? Color);
 }

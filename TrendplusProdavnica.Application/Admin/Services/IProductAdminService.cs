@@ -19,8 +19,8 @@ namespace TrendplusProdavnica.Application.Admin.Services
 
         Task<ProductAdminDetailDto> GetByIdAsync(long id, CancellationToken cancellationToken = default);
         Task<ProductAdminDetailDto> GetBySlugAsync(string slug, CancellationToken cancellationToken = default);
-        Task<ProductAdminDetailDto> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken = default);
-        Task<ProductAdminDetailDto> UpdateAsync(long id, UpdateProductRequest request, CancellationToken cancellationToken = default);
+        Task<ProductAdminDetailDto> CreateAsync(TrendplusProdavnica.Application.Admin.Dtos.CreateProductRequest request, CancellationToken cancellationToken = default);
+        Task<ProductAdminDetailDto> UpdateAsync(long id, TrendplusProdavnica.Application.Admin.Dtos.UpdateProductRequest request, CancellationToken cancellationToken = default);
         Task<ProductAdminDetailDto> PublishAsync(long id, CancellationToken cancellationToken = default);
         Task<ProductAdminDetailDto> ArchiveAsync(long id, CancellationToken cancellationToken = default);
         Task<ProductAdminDetailDto> UnarchiveToDraftAsync(long id, CancellationToken cancellationToken = default);

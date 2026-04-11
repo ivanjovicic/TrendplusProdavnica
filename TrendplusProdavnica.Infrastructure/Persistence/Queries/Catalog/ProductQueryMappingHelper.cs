@@ -83,7 +83,10 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 BuildBadges(projection.IsNew, projection.IsBestseller, projection.IsOnSale),
                 projection.IsInStock,
                 projection.AvailableSizesCount,
-                projection.ColorLabel);
+                projection.ColorLabel,
+                projection.IsNew,
+                projection.IsBestseller,
+                projection.IsOnSale);
         }
 
         internal static ProductCardDto[] ToProductCardDtos(IEnumerable<ProductCardProjection> projections)
@@ -122,6 +125,12 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 !string.IsNullOrWhiteSpace(seo?.SeoTitle) ? seo!.SeoTitle! : fallbackTitle,
                 !string.IsNullOrWhiteSpace(seo?.SeoDescription) ? seo!.SeoDescription! : fallbackDescription,
                 seo?.CanonicalUrl,
+                null,
+                seo?.RobotsDirective,
+                seo?.OgTitle,
+                seo?.OgDescription,
+                seo?.OgImageUrl,
+                seo?.StructuredDataOverrideJson,
                 null);
         }
 

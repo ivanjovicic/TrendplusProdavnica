@@ -3,6 +3,18 @@ using System.Text.Json;
 
 namespace TrendplusProdavnica.Application.Admin.Dtos
 {
+    /// <summary>
+    /// Generic paginated response wrapper for admin list endpoints
+    /// </summary>
+    public class AdminListResponse<T>
+    {
+        public List<T> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+        public int TotalPages => (TotalCount + PageSize - 1) / PageSize;
+    }
+
     public record SeoAdminDto(
         string? SeoTitle,
         string? SeoDescription,

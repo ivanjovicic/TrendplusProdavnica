@@ -124,7 +124,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
                 {
                     SeoTitle = seed.SeoTitle,
                     SeoDescription = seed.SeoDescription,
-                    CanonicalUrl = $"/brend/{seed.BrandSlug}"
+                    CanonicalUrl = $"/brendovi/{seed.BrandSlug}"
                 };
                 page.UpdatedAtUtc = now;
             }
@@ -179,7 +179,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
                 {
                     SeoTitle = seed.SeoTitle,
                     SeoDescription = seed.SeoDescription,
-                    CanonicalUrl = $"/kolekcija/{seed.CollectionSlug}"
+                    CanonicalUrl = $"/kolekcije/{seed.CollectionSlug}"
                 };
                 page.UpdatedAtUtc = now;
             }

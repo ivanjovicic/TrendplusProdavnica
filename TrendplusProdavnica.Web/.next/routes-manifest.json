@@ -1,0 +1,277 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    },
+    {
+      "source": "/:categorySlug((?!kategorije|brendovi|kolekcije|proizvod|prodavnice|akcija|editorial|admin|api|_next|fonts|images|CDN).*)",
+      "destination": "/kategorije/:categorySlug",
+      "statusCode": 308,
+      "regex": "^(?!/_next)(?:/((?!kategorije|brendovi|kolekcije|proizvod|prodavnice|akcija|editorial|admin|api|_next|fonts|images|CDN).*))(?:/)?$"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/_next/static/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/_next/static(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    },
+    {
+      "source": "/fonts/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/fonts(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    },
+    {
+      "source": "/images/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^/images(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    }
+  ],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/akcija/[categorySlug]",
+      "regex": "^/akcija/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPcategorySlug": "nxtPcategorySlug"
+      },
+      "namedRegex": "^/akcija/(?<nxtPcategorySlug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/brendovi/[slug]",
+      "regex": "^/brendovi/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/brendovi/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/editorial/[slug]",
+      "regex": "^/editorial/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/editorial/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/kategorija/[slug]",
+      "regex": "^/kategorija/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/kategorija/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/kolekcije/[slug]",
+      "regex": "^/kolekcije/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/kolekcije/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/porudzbina/[orderNumber]",
+      "regex": "^/porudzbina/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPorderNumber": "nxtPorderNumber"
+      },
+      "namedRegex": "^/porudzbina/(?<nxtPorderNumber>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/prodavnice/[slug]",
+      "regex": "^/prodavnice/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/prodavnice/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/proizvod/[slug]",
+      "regex": "^/proizvod/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/proizvod/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/[categorySlug]",
+      "regex": "^/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPcategorySlug": "nxtPcategorySlug"
+      },
+      "namedRegex": "^/(?<nxtPcategorySlug>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/admin",
+      "regex": "^/admin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin(?:/)?$"
+    },
+    {
+      "page": "/admin/brands",
+      "regex": "^/admin/brands(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/brands(?:/)?$"
+    },
+    {
+      "page": "/admin/collections",
+      "regex": "^/admin/collections(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/collections(?:/)?$"
+    },
+    {
+      "page": "/admin/editorial",
+      "regex": "^/admin/editorial(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/editorial(?:/)?$"
+    },
+    {
+      "page": "/admin/homepage",
+      "regex": "^/admin/homepage(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/homepage(?:/)?$"
+    },
+    {
+      "page": "/admin/login",
+      "regex": "^/admin/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/login(?:/)?$"
+    },
+    {
+      "page": "/admin/orders",
+      "regex": "^/admin/orders(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/orders(?:/)?$"
+    },
+    {
+      "page": "/admin/products",
+      "regex": "^/admin/products(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/products(?:/)?$"
+    },
+    {
+      "page": "/akcija",
+      "regex": "^/akcija(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/akcija(?:/)?$"
+    },
+    {
+      "page": "/checkout",
+      "regex": "^/checkout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/checkout(?:/)?$"
+    },
+    {
+      "page": "/editorial",
+      "regex": "^/editorial(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/editorial(?:/)?$"
+    },
+    {
+      "page": "/kategorije/%5Bslug%5D",
+      "regex": "^/kategorije/%5Bslug%5D(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/kategorije/%5Bslug%5D(?:/)?$"
+    },
+    {
+      "page": "/korpa",
+      "regex": "^/korpa(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/korpa(?:/)?$"
+    },
+    {
+      "page": "/omiljeno",
+      "regex": "^/omiljeno(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/omiljeno(?:/)?$"
+    },
+    {
+      "page": "/prodavnice",
+      "regex": "^/prodavnice(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/prodavnice(?:/)?$"
+    },
+    {
+      "page": "/proizvod/%5Bslug%5D",
+      "regex": "^/proizvod/%5Bslug%5D(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/proizvod/%5Bslug%5D(?:/)?$"
+    },
+    {
+      "page": "/robots.txt",
+      "regex": "^/robots\\.txt(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/robots\\.txt(?:/)?$"
+    },
+    {
+      "page": "/search",
+      "regex": "^/search(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/search(?:/)?$"
+    },
+    {
+      "page": "/sitemap.xml",
+      "regex": "^/sitemap\\.xml(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sitemap\\.xml(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

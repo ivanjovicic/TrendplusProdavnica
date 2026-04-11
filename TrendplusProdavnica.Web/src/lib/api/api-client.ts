@@ -1,5 +1,12 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7002/api';
 
+type SearchParamPrimitive = string | number | boolean;
+type SearchParamValue =
+  | SearchParamPrimitive
+  | SearchParamPrimitive[]
+  | undefined
+  | null;
+
 export interface ApiError {
   error: string;
   message: string;
@@ -15,9 +22,9 @@ export interface ApiResponse<T> {
 class ApiClient {
   private baseUrl = API_BASE_URL;
 
-  async fetch<T>(
+  async fetch<T, TSearchParams extends object = Record<string, SearchParamValue>>(
     endpoint: string,
-    options?: RequestInit & { searchParams?: Record<string, string | number | boolean | undefined> }
+    options?: RequestInit & { searchParams?: TSearchParams }
   ): Promise<T> {
     const { searchParams, ...fetchOptions } = options || {};
     
@@ -25,7 +32,16 @@ class ApiClient {
     
     if (searchParams) {
       const params = new URLSearchParams();
-      Object.entries(searchParams).forEach(([key, value]) => {
+      Object.entries(searchParams as Record<string, SearchParamValue>).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach((item) => {
+            if (item !== undefined && item !== null && item !== '') {
+              params.append(key, String(item));
+            }
+          });
+          return;
+        }
+
         if (value !== undefined && value !== null && value !== '') {
           params.append(key, String(value));
         }
@@ -58,8 +74,11 @@ class ApiClient {
     return response.json();
   }
 
-  async get<T>(endpoint: string, options?: RequestInit & { searchParams?: Record<string, any> }): Promise<T> {
-    return this.fetch<T>(endpoint, { ...options, method: 'GET' });
+  async get<T, TSearchParams extends object = Record<string, SearchParamValue>>(
+    endpoint: string,
+    options?: RequestInit & { searchParams?: TSearchParams }
+  ): Promise<T> {
+    return this.fetch<T, TSearchParams>(endpoint, { ...options, method: 'GET' });
   }
 
   async post<T>(endpoint: string, body?: any, options?: RequestInit): Promise<T> {

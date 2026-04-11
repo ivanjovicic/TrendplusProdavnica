@@ -42,8 +42,10 @@ namespace TrendplusProdavnica.Domain.Catalog
 
         public IList<ProductVariant> Variants { get; } = new List<ProductVariant>();
         public IList<ProductMedia> Media { get; } = new List<ProductMedia>();
+        public IList<ProductReview> Reviews { get; } = new List<ProductReview>();
         public IList<ProductCategoryMap> CategoryMaps { get; } = new List<ProductCategoryMap>();
         public IList<ProductCollectionMap> CollectionMaps { get; } = new List<ProductCollectionMap>();
         public IList<ProductRelatedProduct> RelatedProducts { get; } = new List<ProductRelatedProduct>();
+        public ProductRating? Rating { get; set; }
     }
 }

@@ -296,6 +296,122 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        private async Task UpsertProductReviewsAsync(
+            IReadOnlyList<ProductSeed> seeds,
+            IReadOnlyDictionary<string, Product> products,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            var reviewSeeds = BuildProductReviewSeeds(seeds);
+            var externalKeys = reviewSeeds
+                .Select(seed => seed.ExternalKey)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            if (externalKeys.Length == 0)
+            {
+                return;
+            }
+
+            var existing = await _db.ProductReviews
+                .Where(entity => entity.ExternalKey != null && externalKeys.Contains(entity.ExternalKey))
+                .ToDictionaryAsync(entity => entity.ExternalKey!, cancellationToken);
+
+            foreach (var seed in reviewSeeds)
+            {
+                if (!products.TryGetValue(seed.ProductSlug, out var product))
+                {
+                    continue;
+                }
+
+                if (!existing.TryGetValue(seed.ExternalKey, out var review))
+                {
+                    review = new ProductReview
+                    {
+                        ExternalKey = seed.ExternalKey,
+                        CreatedAtUtc = now
+                    };
+                    _db.ProductReviews.Add(review);
+                    existing[seed.ExternalKey] = review;
+                }
+
+                review.ProductId = product.Id;
+                review.AuthorName = seed.AuthorName;
+                review.Title = seed.Title;
+                review.ReviewBody = seed.ReviewBody;
+                review.RatingValue = seed.RatingValue;
+                review.IsVerifiedPurchase = seed.IsVerifiedPurchase;
+                review.Status = seed.Status;
+                review.PublishedAtUtc = seed.Status == ProductReviewStatus.Published
+                    ? now.AddDays(-seed.PublishedDaysAgo)
+                    : null;
+                review.UpdatedAtUtc = now;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        private async Task UpsertProductRatingsAsync(
+            IReadOnlyDictionary<string, Product> products,
+            DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            var productIds = products.Values
+                .Select(product => product.Id)
+                .Distinct()
+                .ToArray();
+
+            if (productIds.Length == 0)
+            {
+                return;
+            }
+
+            var reviews = await _db.ProductReviews
+                .Where(review => productIds.Contains(review.ProductId))
+                .ToArrayAsync(cancellationToken);
+            var summaries = BuildProductRatingSummaries(reviews, now)
+                .ToDictionary(summary => summary.ProductId);
+
+            var existing = await _db.ProductRatings
+                .Where(entity => productIds.Contains(entity.ProductId))
+                .ToListAsync(cancellationToken);
+
+            foreach (var rating in existing.Where(rating => !summaries.ContainsKey(rating.ProductId)).ToArray())
+            {
+                _db.ProductRatings.Remove(rating);
+                existing.Remove(rating);
+            }
+
+            foreach (var summary in summaries.Values)
+            {
+                var rating = existing.FirstOrDefault(entity => entity.ProductId == summary.ProductId);
+
+                if (rating is null)
+                {
+                    rating = new ProductRating
+                    {
+                        ProductId = summary.ProductId,
+                        CreatedAtUtc = now
+                    };
+                    _db.ProductRatings.Add(rating);
+                    existing.Add(rating);
+                }
+
+                rating.AverageRating = summary.AverageRating;
+                rating.ReviewCount = summary.ReviewCount;
+                rating.RatingCount = summary.RatingCount;
+                rating.OneStarCount = summary.OneStarCount;
+                rating.TwoStarCount = summary.TwoStarCount;
+                rating.ThreeStarCount = summary.ThreeStarCount;
+                rating.FourStarCount = summary.FourStarCount;
+                rating.FiveStarCount = summary.FiveStarCount;
+                rating.LastReviewAtUtc = summary.LastReviewAtUtc;
+                rating.UpdatedAtUtc = now;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         private async Task SeedStoreInventoryAsync(DateTimeOffset now, CancellationToken cancellationToken)
         {
             var stores = await _db.Stores.AsNoTracking()

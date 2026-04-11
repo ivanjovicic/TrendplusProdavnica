@@ -1,0 +1,99 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+# The root route with all parameters
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  
+  routes:
+    # Critical alerts go to PagerDuty immediately
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      group_wait: 0s
+      repeat_interval: 4h
+      
+    # Warning alerts go to Slack
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 30s
+      repeat_interval: 24h
+      
+    # Database alerts
+    - match:
+        component: database
+      receiver: 'slack-database'
+      repeat_interval: 8h
+      
+    # API alerts
+    - match:
+        component: api
+      receiver: 'slack-api'
+      repeat_interval: 6h
+      
+    # Demand prediction alerts
+    - match:
+        component: demand_prediction
+      receiver: 'slack-prediction'
+      repeat_interval: 8h
+
+# Receivers define how and where to send alerts
+receivers:
+  - name: 'default'
+    slack_configs:
+      - channel: '#alerts'
+        title: 'Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .Alerts.Firing | len }} firing'
+        
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#warnings'
+        color: 'warning'
+        title: 'Warning: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        
+  - name: 'slack-database'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: 'Database Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        
+  - name: 'slack-api'
+    slack_configs:
+      - channel: '#api-alerts'
+        title: 'API Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        
+  - name: 'slack-prediction'
+    slack_configs:
+      - channel: '#prediction-alerts'
+        title: 'Prediction Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+inhibit_rules:
+  # Suppress warning alerts if critical alert exists
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
+    
+  # Suppress info logs about firing alerts if the alert itself fired
+  - source_match:
+      severity: 'warning'
+    target_match_re:
+      severity: 'info|debug'
+    equal: ['alertname']

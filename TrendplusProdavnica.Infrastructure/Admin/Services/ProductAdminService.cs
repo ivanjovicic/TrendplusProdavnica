@@ -8,13 +8,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TrendplusProdavnica.Application.Admin.Common;
 using TrendplusProdavnica.Application.Admin.Dtos;
-using TrendplusProdavnica.Application.Admin.Services;
 using TrendplusProdavnica.Application.Common.Caching;
 using TrendplusProdavnica.Application.Search.Services;
 using TrendplusProdavnica.Domain.Catalog;
 using TrendplusProdavnica.Domain.Enums;
 using TrendplusProdavnica.Infrastructure.Admin.Common;
 using TrendplusProdavnica.Infrastructure.Persistence;
+using IProductAdminService = TrendplusProdavnica.Application.Admin.Services.IProductAdminService;
 
 namespace TrendplusProdavnica.Infrastructure.Admin.Services
 {
@@ -85,7 +85,17 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                     product.PrimaryCategoryId,
                     product.Name,
                     product.Slug,
+                    _db.ProductVariants
+                        .Where(variant => variant.ProductId == product.Id && variant.IsActive && variant.IsVisible)
+                        .Select(variant => (decimal?)variant.Price)
+                        .OrderBy(price => price)
+                        .FirstOrDefault(),
+                    _db.ProductVariants
+                        .Where(variant => variant.ProductId == product.Id && variant.IsActive)
+                        .Select(variant => (int?)variant.TotalStock)
+                        .Sum() ?? 0,
                     product.Status,
+                    product.Status != ProductStatus.Archived,
                     product.IsVisible,
                     product.IsPurchasable,
                     product.IsNew,
@@ -128,7 +138,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             return MapDetail(entity);
         }
 
-        public async Task<ProductAdminDetailDto> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken = default)
+        public async Task<ProductAdminDetailDto> CreateAsync(TrendplusProdavnica.Application.Admin.Dtos.CreateProductRequest request, CancellationToken cancellationToken = default)
         {
             await ValidateRequestAsync(request, null, cancellationToken);
 
@@ -177,7 +187,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             return await GetByIdAsync(entity.Id, cancellationToken);
         }
 
-        public async Task<ProductAdminDetailDto> UpdateAsync(long id, UpdateProductRequest request, CancellationToken cancellationToken = default)
+        public async Task<ProductAdminDetailDto> UpdateAsync(long id, TrendplusProdavnica.Application.Admin.Dtos.UpdateProductRequest request, CancellationToken cancellationToken = default)
         {
             var entity = await _db.Products
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
@@ -387,7 +397,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 entity.Version);
         }
 
-        private async Task ValidateRequestAsync(CreateProductRequest request, long? excludeId, CancellationToken cancellationToken)
+        private async Task ValidateRequestAsync(TrendplusProdavnica.Application.Admin.Dtos.CreateProductRequest request, long? excludeId, CancellationToken cancellationToken)
         {
             var errors = new Dictionary<string, string[]>();
             ValidateSharedRequest(
@@ -424,7 +434,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             }
         }
 
-        private async Task ValidateRequestAsync(UpdateProductRequest request, long? excludeId, CancellationToken cancellationToken)
+        private async Task ValidateRequestAsync(TrendplusProdavnica.Application.Admin.Dtos.UpdateProductRequest request, long? excludeId, CancellationToken cancellationToken)
         {
             var errors = new Dictionary<string, string[]>();
             ValidateSharedRequest(

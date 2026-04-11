@@ -1,5 +1,4 @@
 #nullable enable
-using TrendplusProdavnica.Application.Catalog.Queries;
 using TrendplusProdavnica.Application.Common.Caching;
 
 namespace TrendplusProdavnica.Infrastructure.Caching
@@ -19,13 +18,5 @@ namespace TrendplusProdavnica.Infrastructure.Caching
         public string EditorialDetail(string slug) => $"editorial:{slug}";
 
         public string EditorialList() => "editorial:list";
-
-        public string? CategoryListing(GetCategoryListingQuery query) => null;
-
-        public string? BrandListing(GetBrandListingQuery query) => null;
-
-        public string? CollectionListing(GetCollectionListingQuery query) => null;
-
-        public string? SaleListing(GetSaleListingQuery query) => null;
     }
 }

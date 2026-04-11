@@ -8,7 +8,7 @@ namespace TrendplusProdavnica.Application.Search.Services
 {
     public interface IProductSearchService
     {
-        Task<ProductSearchResultDto> SearchProductsAsync(ProductSearchQuery query, CancellationToken cancellationToken = default);
+        Task<SearchResponseDto> SearchProductsAsync(ProductSearchQuery query, CancellationToken cancellationToken = default);
         Task<ProductAutocompleteResultDto> AutocompleteAsync(ProductAutocompleteQuery query, CancellationToken cancellationToken = default);
     }
 }

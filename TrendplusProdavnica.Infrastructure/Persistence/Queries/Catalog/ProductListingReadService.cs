@@ -8,7 +8,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TrendplusProdavnica.Application.Catalog.Listing;
+using TrendplusProdavnica.Application.Merchandising.Services;
 using TrendplusProdavnica.Domain.Enums;
 using TrendplusProdavnica.Infrastructure.Persistence;
 using ZiggyCreatures.Caching.Fusion;
@@ -32,11 +34,19 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
         private readonly TrendplusDbContext _db;
         private readonly IFusionCache _cache;
+        private readonly IMerchandisingService _merchandisingService;
+        private readonly ILogger<ProductListingReadService> _logger;
 
-        public ProductListingReadService(TrendplusDbContext db, IFusionCache cache)
+        public ProductListingReadService(
+            TrendplusDbContext db,
+            IFusionCache cache,
+            IMerchandisingService merchandisingService,
+            ILogger<ProductListingReadService> logger)
         {
             _db = db;
             _cache = cache;
+            _merchandisingService = merchandisingService;
+            _logger = logger;
         }
 
         public Task<ProductListingResponse> GetProductsAsync(ProductListingQuery query, CancellationToken cancellationToken = default)
@@ -66,88 +76,32 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             products = ApplyValueFilters(products, query);
 
             var totalCount = await products.LongCountAsync(cancellationToken);
-            var sorted = ApplySort(products, query.Sort);
+            var candidateRows = totalCount == 0
+                ? Array.Empty<ListingCandidateRow>()
+                : await BuildCandidateRowsQuery(products).ToArrayAsync(cancellationToken);
 
-            var productRows = await (
-                    from product in sorted
-                        .Skip((query.Page - 1) * query.PageSize)
-                        .Take(query.PageSize)
-                    join brand in _db.Brands.AsNoTracking() on product.BrandId equals brand.Id
-                    select new
-                    {
-                        product.Id,
-                        product.Slug,
-                        product.Name,
-                        BrandName = brand.Name,
-                        product.IsNew,
-                        product.PrimaryColorName,
-                        Price = product.Variants
-                            .Where(variant => variant.IsActive && variant.IsVisible)
-                            .Select(variant => (decimal?)variant.Price)
-                            .Min(),
-                        OldPrice = product.Variants
-                            .Where(variant =>
-                                variant.IsActive &&
-                                variant.IsVisible &&
-                                variant.OldPrice.HasValue &&
-                                variant.OldPrice.Value > variant.Price)
-                            .Select(variant => variant.OldPrice)
-                            .Min(),
-                        IsOnSale = product.Variants.Any(variant =>
-                            variant.IsActive &&
-                            variant.IsVisible &&
-                            variant.OldPrice.HasValue &&
-                            variant.OldPrice.Value > variant.Price),
-                        PrimaryImageUrl = product.Media
-                            .Where(media => media.IsActive && media.IsPrimary)
-                            .OrderBy(media => media.SortOrder)
-                            .Select(media => media.Url)
-                            .FirstOrDefault(),
-                        SecondaryImageUrl = product.Media
-                            .Where(media => media.IsActive && !media.IsPrimary)
-                            .OrderBy(media => media.SortOrder)
-                            .Select(media => media.Url)
-                            .FirstOrDefault(),
-                        FallbackImageUrl = product.Media
-                            .Where(media => media.IsActive)
-                            .OrderBy(media => media.SortOrder)
-                            .Select(media => media.Url)
-                            .FirstOrDefault(),
-                        AvailableSizesCount = product.Variants
-                            .Where(variant => variant.IsActive && variant.IsVisible && variant.TotalStock > 0)
-                            .Select(variant => variant.SizeEu)
-                            .Distinct()
-                            .Count()
-                    })
-                .ToArrayAsync(cancellationToken);
+            var pageProductIds = await SortAndPageCandidatesAsync(candidateRows, query, cancellationToken);
+
+            var productRows = pageProductIds.Length == 0
+                ? Array.Empty<ListingProductRow>()
+                : await BuildProductRowsQuery(pageProductIds).ToArrayAsync(cancellationToken);
+
+            var orderMap = pageProductIds
+                .Select((productId, index) => new { productId, index })
+                .ToDictionary(item => item.productId, item => item.index);
 
             var productCards = productRows
-                .Select(row =>
-                {
-                    var displayPrice = row.Price ?? 0m;
-                    var oldPrice = row.OldPrice;
-                    var discountPercent = oldPrice.HasValue && oldPrice.Value > displayPrice && displayPrice > 0
-                        ? (int?)Math.Round((oldPrice.Value - displayPrice) / oldPrice.Value * 100m, MidpointRounding.AwayFromZero)
-                        : null;
-
-                    return new ProductCardDto(
-                        row.Id,
-                        row.Slug,
-                        row.Name,
-                        row.BrandName,
-                        displayPrice,
-                        oldPrice,
-                        discountPercent,
-                        row.PrimaryImageUrl ?? row.FallbackImageUrl ?? string.Empty,
-                        row.SecondaryImageUrl,
-                        row.AvailableSizesCount,
-                        row.IsNew,
-                        row.IsOnSale,
-                        row.PrimaryColorName);
-                })
+                .OrderBy(row => orderMap[row.ProductId])
+                .Select(MapProductCard)
                 .ToArray();
 
-            var facets = await BuildFacetsAsync(products, cancellationToken);
+            var facets = totalCount == 0
+                ? new ProductListingFacets(
+                    Array.Empty<BrandFacetItem>(),
+                    Array.Empty<SizeFacetItem>(),
+                    Array.Empty<ColorFacetItem>(),
+                    new PriceRangeFacet(null, null))
+                : await BuildFacetsAsync(products, cancellationToken);
 
             return new ProductListingResponse(
                 productCards,
@@ -156,6 +110,195 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 query.PageSize,
                 facets,
                 BuildCanonicalUrl(query));
+        }
+
+        private IQueryable<ListingCandidateRow> BuildCandidateRowsQuery(IQueryable<Domain.Catalog.Product> products)
+        {
+            return products.Select(product => new ListingCandidateRow(
+                product.Id,
+                product.PrimaryCategoryId,
+                product.BrandId,
+                product.Variants
+                    .Where(variant => variant.IsActive && variant.IsVisible)
+                    .Select(variant => (decimal?)variant.Price)
+                    .Min(),
+                product.IsBestseller,
+                product.SortRank,
+                product.PublishedAtUtc));
+        }
+
+        private IQueryable<ListingProductRow> BuildProductRowsQuery(long[] pageProductIds)
+        {
+            return from product in _db.Products.AsNoTracking()
+                   where pageProductIds.Contains(product.Id)
+                   join brand in _db.Brands.AsNoTracking() on product.BrandId equals brand.Id
+                   select new ListingProductRow(
+                       product.Id,
+                       product.Slug,
+                       product.Name,
+                       brand.Name,
+                       product.PrimaryColorName,
+                       product.IsNew,
+                       product.IsBestseller,
+                       product.Variants.Any(variant =>
+                           variant.IsActive &&
+                           variant.IsVisible &&
+                           variant.OldPrice.HasValue &&
+                           variant.OldPrice.Value > variant.Price),
+                       product.Variants
+                           .Where(variant => variant.IsActive && variant.IsVisible)
+                           .Select(variant => (decimal?)variant.Price)
+                           .Min(),
+                       product.Variants
+                           .Where(variant =>
+                               variant.IsActive &&
+                               variant.IsVisible &&
+                               variant.OldPrice.HasValue &&
+                               variant.OldPrice.Value > variant.Price)
+                           .Select(variant => variant.OldPrice)
+                           .Min(),
+                       product.Media
+                           .Where(media => media.IsActive && media.IsPrimary)
+                           .OrderBy(media => media.SortOrder)
+                           .Select(media => media.Url)
+                           .FirstOrDefault(),
+                       product.Media
+                           .Where(media => media.IsActive && !media.IsPrimary)
+                           .OrderBy(media => media.SortOrder)
+                           .Select(media => media.Url)
+                           .FirstOrDefault(),
+                       product.Media
+                           .Where(media => media.IsActive)
+                           .OrderBy(media => media.SortOrder)
+                           .Select(media => media.Url)
+                           .FirstOrDefault(),
+                       product.Variants
+                           .Where(variant => variant.IsActive && variant.IsVisible && variant.TotalStock > 0)
+                           .Select(variant => variant.SizeEu)
+                           .Distinct()
+                           .Count());
+        }
+
+        private async Task<long[]> SortAndPageCandidatesAsync(
+            IReadOnlyList<ListingCandidateRow> candidates,
+            NormalizedListingQuery query,
+            CancellationToken cancellationToken)
+        {
+            if (candidates.Count == 0)
+            {
+                return Array.Empty<long>();
+            }
+
+            var adjustments = await EvaluateMerchandisingAdjustmentsAsync(candidates, cancellationToken);
+            var scoredCandidates = candidates
+                .Select(candidate => new ScoredListingCandidate(
+                    candidate,
+                    adjustments.TryGetValue(candidate.ProductId, out var adjustedScore)
+                        ? adjustedScore
+                        : CalculateBaseScore(candidate)))
+                .ToArray();
+
+            var sortedCandidates = query.Sort switch
+            {
+                "newest" => scoredCandidates
+                    .OrderByDescending(item => item.AdjustedScore)
+                    .ThenByDescending(item => item.Candidate.PublishedAtUtc)
+                    .ThenByDescending(item => item.Candidate.ProductId),
+                "price_asc" => scoredCandidates
+                    .OrderBy(item => item.Candidate.MinPrice ?? decimal.MaxValue)
+                    .ThenByDescending(item => item.AdjustedScore)
+                    .ThenByDescending(item => item.Candidate.ProductId),
+                "price_desc" => scoredCandidates
+                    .OrderByDescending(item => item.Candidate.MinPrice ?? 0m)
+                    .ThenByDescending(item => item.AdjustedScore)
+                    .ThenByDescending(item => item.Candidate.ProductId),
+                "bestsellers" => scoredCandidates
+                    .OrderByDescending(item => item.AdjustedScore)
+                    .ThenByDescending(item => item.Candidate.IsBestseller)
+                    .ThenByDescending(item => item.Candidate.SortRank)
+                    .ThenByDescending(item => item.Candidate.PublishedAtUtc)
+                    .ThenByDescending(item => item.Candidate.ProductId),
+                _ => scoredCandidates
+                    .OrderByDescending(item => item.AdjustedScore)
+                    .ThenByDescending(item => item.Candidate.SortRank)
+                    .ThenByDescending(item => item.Candidate.IsBestseller)
+                    .ThenByDescending(item => item.Candidate.PublishedAtUtc)
+                    .ThenByDescending(item => item.Candidate.ProductId)
+            };
+
+            return sortedCandidates
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .Select(item => item.Candidate.ProductId)
+                .ToArray();
+        }
+
+        private async Task<Dictionary<long, decimal>> EvaluateMerchandisingAdjustmentsAsync(
+            IReadOnlyList<ListingCandidateRow> candidates,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var inputs = candidates.Select(candidate => new RuleEvaluationInput
+                {
+                    ProductId = candidate.ProductId,
+                    CategoryId = candidate.PrimaryCategoryId,
+                    BrandId = candidate.BrandId,
+                    CurrentScore = CalculateBaseScore(candidate)
+                });
+
+                return await _merchandisingService.EvaluateRulesAsync(inputs, DateTimeOffset.UtcNow);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to evaluate merchandising rules for PLP query. Falling back to base sorting.");
+                return new Dictionary<long, decimal>();
+            }
+        }
+
+        private static decimal CalculateBaseScore(ListingCandidateRow candidate)
+        {
+            var bestsellerBoost = candidate.IsBestseller ? 1000m : 0m;
+            var freshnessAdjustment = 0m;
+
+            if (candidate.PublishedAtUtc.HasValue)
+            {
+                var ageDays = (DateTimeOffset.UtcNow - candidate.PublishedAtUtc.Value).Days;
+                freshnessAdjustment = ageDays > 0 ? -(ageDays * 0.1m) : 0m;
+            }
+
+            return candidate.SortRank + bestsellerBoost + freshnessAdjustment;
+        }
+
+        private static ProductCardDto MapProductCard(ListingProductRow row)
+        {
+            var displayPrice = row.Price ?? 0m;
+            var oldPrice = row.OldPrice;
+            var discountPercent = oldPrice.HasValue && oldPrice.Value > displayPrice && displayPrice > 0
+                ? (int?)Math.Round((oldPrice.Value - displayPrice) / oldPrice.Value * 100m, MidpointRounding.AwayFromZero)
+                : null;
+
+            return new ProductCardDto(
+                row.ProductId,
+                row.Slug,
+                row.Name,
+                row.BrandName,
+                displayPrice,
+                oldPrice,
+                discountPercent,
+                row.PrimaryImageUrl ?? row.FallbackImageUrl ?? string.Empty,
+                row.SecondaryImageUrl,
+                row.AvailableSizesCount,
+                row.IsNew,
+                row.IsBestseller,
+                row.IsOnSale,
+                row.Color);
         }
 
         private async Task<IQueryable<Domain.Catalog.Product>> ApplyScopeFiltersAsync(
@@ -271,38 +414,15 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 products = products.Where(product => product.IsNew);
             }
 
-            return products;
-        }
-
-        private static IQueryable<Domain.Catalog.Product> ApplySort(
-            IQueryable<Domain.Catalog.Product> products,
-            string sort)
-        {
-            return sort switch
+            if (query.InStockOnly == true)
             {
-                "price_asc" => products
-                    .OrderBy(product => product.Variants
-                        .Where(variant => variant.IsActive && variant.IsVisible)
-                        .Select(variant => variant.Price)
-                        .DefaultIfEmpty(decimal.MaxValue)
-                        .Min())
-                    .ThenByDescending(product => product.SortRank),
-                "price_desc" => products
-                    .OrderByDescending(product => product.Variants
-                        .Where(variant => variant.IsActive && variant.IsVisible)
-                        .Select(variant => variant.Price)
-                        .DefaultIfEmpty(0m)
-                        .Min())
-                    .ThenByDescending(product => product.SortRank),
-                "newest" => products
-                    .OrderByDescending(product => product.PublishedAtUtc)
-                    .ThenByDescending(product => product.Id),
-                _ => products
-                    .OrderByDescending(product => product.SortRank)
-                    .ThenByDescending(product => product.IsBestseller)
-                    .ThenByDescending(product => product.PublishedAtUtc)
-                    .ThenByDescending(product => product.Id)
-            };
+                products = products.Where(product => product.Variants.Any(variant =>
+                    variant.IsActive &&
+                    variant.IsVisible &&
+                    variant.TotalStock > 0));
+            }
+
+            return products;
         }
 
         private async Task<ProductListingFacets> BuildFacetsAsync(
@@ -319,17 +439,20 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 .Take(30)
                 .ToArrayAsync(cancellationToken);
 
-            var sizeFacets = await products
+            var sizeFacetRows = await products
                 .SelectMany(product => product.Variants
                     .Where(variant => variant.IsActive && variant.IsVisible)
                     .Select(variant => new { product.Id, variant.SizeEu }))
                 .Distinct()
+                .ToArrayAsync(cancellationToken);
+
+            var sizeFacets = sizeFacetRows
                 .GroupBy(row => row.SizeEu)
                 .Select(group => new SizeFacetItem(group.Key, group.Count()))
                 .OrderBy(item => item.Size)
-                .ToArrayAsync(cancellationToken);
+                .ToArray();
 
-            var colorFacets = await products
+            var colorFacetRows = await products
                 .SelectMany(product => product.Variants
                     .Where(variant => variant.IsActive && variant.IsVisible)
                     .Select(variant => new
@@ -339,19 +462,23 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                     }))
                 .Where(row => row.Color != string.Empty)
                 .Distinct()
+                .ToArrayAsync(cancellationToken);
+
+            var colorFacets = colorFacetRows
                 .GroupBy(row => row.Color)
                 .Select(group => new ColorFacetItem(group.Key, group.Count()))
                 .OrderBy(item => item.Color)
-                .ToArrayAsync(cancellationToken);
+                .ToArray();
 
-            var priceRange = await products
+            var priceRows = await products
                 .SelectMany(product => product.Variants
                     .Where(variant => variant.IsActive && variant.IsVisible)
                     .Select(variant => (decimal?)variant.Price))
-                .GroupBy(_ => 1)
-                .Select(group => new PriceRangeFacet(group.Min(), group.Max()))
-                .FirstOrDefaultAsync(cancellationToken)
-                ?? new PriceRangeFacet(null, null);
+                .ToArrayAsync(cancellationToken);
+
+            var priceRange = priceRows.Length == 0
+                ? new PriceRangeFacet(null, null)
+                : new PriceRangeFacet(priceRows.Min(), priceRows.Max());
 
             return new ProductListingFacets(
                 brandFacets,
@@ -389,6 +516,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                     .ToArray(),
                 query.IsOnSale,
                 query.IsNew,
+                query.InStockOnly,
                 page,
                 pageSize,
                 NormalizeSort(query.Sort));
@@ -408,6 +536,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 $"brands={string.Join(",", query.Brands)}",
                 $"sale={BoolToken(query.IsOnSale)}",
                 $"new={BoolToken(query.IsNew)}",
+                $"stock={BoolToken(query.InStockOnly)}",
                 $"page={query.Page}",
                 $"pageSize={query.PageSize}",
                 $"sort={query.Sort}"
@@ -419,82 +548,32 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
         private static string BuildCanonicalUrl(NormalizedListingQuery query)
         {
-            string path;
-            if (!string.IsNullOrWhiteSpace(query.CategorySlug))
+            if (!string.IsNullOrWhiteSpace(query.BrandSlug))
             {
-                path = $"/{query.CategorySlug}";
-            }
-            else if (!string.IsNullOrWhiteSpace(query.BrandSlug))
-            {
-                path = $"/brendovi/{query.BrandSlug}";
-            }
-            else if (!string.IsNullOrWhiteSpace(query.CollectionSlug))
-            {
-                path = $"/kolekcije/{query.CollectionSlug}";
-            }
-            else
-            {
-                path = "/katalog";
+                return $"/brendovi/{query.BrandSlug}";
             }
 
-            var parameters = new List<string>();
-
-            if (query.MinPrice.HasValue)
+            if (!string.IsNullOrWhiteSpace(query.CollectionSlug))
             {
-                parameters.Add($"minPrice={Uri.EscapeDataString(FormatDecimal(query.MinPrice))}");
+                return $"/kolekcije/{query.CollectionSlug}";
             }
 
-            if (query.MaxPrice.HasValue)
+            if (query.IsOnSale == true && !string.IsNullOrWhiteSpace(query.CategorySlug))
             {
-                parameters.Add($"maxPrice={Uri.EscapeDataString(FormatDecimal(query.MaxPrice))}");
-            }
-
-            if (query.Sizes.Length > 0)
-            {
-                parameters.Add($"sizes={Uri.EscapeDataString(string.Join(",", query.Sizes.Select(value => value.ToString("0.##", CultureInfo.InvariantCulture))))}");
-            }
-
-            if (query.Colors.Length > 0)
-            {
-                parameters.Add($"colors={Uri.EscapeDataString(string.Join(",", query.Colors))}");
-            }
-
-            if (query.Brands.Length > 0)
-            {
-                parameters.Add($"brands={Uri.EscapeDataString(string.Join(",", query.Brands))}");
+                return $"/akcija/{query.CategorySlug}";
             }
 
             if (query.IsOnSale == true)
             {
-                parameters.Add("isOnSale=true");
+                return "/akcija";
             }
 
-            if (query.IsNew == true)
+            if (!string.IsNullOrWhiteSpace(query.CategorySlug))
             {
-                parameters.Add("isNew=true");
+                return $"/{query.CategorySlug}";
             }
 
-            if (!string.Equals(query.Sort, "popular", StringComparison.Ordinal))
-            {
-                parameters.Add($"sort={Uri.EscapeDataString(query.Sort)}");
-            }
-
-            if (query.Page > 1)
-            {
-                parameters.Add($"page={query.Page.ToString(CultureInfo.InvariantCulture)}");
-            }
-
-            if (query.PageSize != 24)
-            {
-                parameters.Add($"pageSize={query.PageSize.ToString(CultureInfo.InvariantCulture)}");
-            }
-
-            if (parameters.Count == 0)
-            {
-                return path;
-            }
-
-            return $"{path}?{string.Join("&", parameters)}";
+            return "/katalog";
         }
 
         private static string NormalizeSort(string? sort)
@@ -505,9 +584,14 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 
             return normalized switch
             {
+                "popular" => "popular",
+                "recommended" => "popular",
                 "price_asc" => "price_asc",
+                "price-asc" => "price_asc",
                 "price_desc" => "price_desc",
+                "price-desc" => "price_desc",
                 "newest" => "newest",
+                "bestsellers" => "bestsellers",
                 _ => "popular"
             };
         }
@@ -531,6 +615,33 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             return value.HasValue ? (value.Value ? "1" : "0") : string.Empty;
         }
 
+        private sealed record ListingCandidateRow(
+            long ProductId,
+            long PrimaryCategoryId,
+            long BrandId,
+            decimal? MinPrice,
+            bool IsBestseller,
+            int SortRank,
+            DateTimeOffset? PublishedAtUtc);
+
+        private sealed record ScoredListingCandidate(ListingCandidateRow Candidate, decimal AdjustedScore);
+
+        private sealed record ListingProductRow(
+            long ProductId,
+            string Slug,
+            string Name,
+            string BrandName,
+            string? Color,
+            bool IsNew,
+            bool IsBestseller,
+            bool IsOnSale,
+            decimal? Price,
+            decimal? OldPrice,
+            string? PrimaryImageUrl,
+            string? SecondaryImageUrl,
+            string? FallbackImageUrl,
+            int AvailableSizesCount);
+
         private sealed record NormalizedListingQuery(
             string? CategorySlug,
             string? BrandSlug,
@@ -542,6 +653,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             long[] Brands,
             bool? IsOnSale,
             bool? IsNew,
+            bool? InStockOnly,
             int Page,
             int PageSize,
             string Sort);

@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,22 +14,27 @@ namespace TrendplusProdavnica.Infrastructure.Search
 {
     public sealed class OpenSearchProductSearchService : IProductSearchService
     {
-        private const int FacetBucketSize = 20;
         private readonly IOpenSearchClient _client;
         private readonly OpenSearchSettings _openSearchSettings;
         private readonly SearchSettings _searchSettings;
+        private readonly ProductSearchQueryBuilder _queryBuilder;
+        private readonly ProductSearchFacetBuilder _facetBuilder;
 
         public OpenSearchProductSearchService(
             IOpenSearchClient client,
             IOptions<OpenSearchSettings> openSearchSettings,
-            IOptions<SearchSettings> searchSettings)
+            IOptions<SearchSettings> searchSettings,
+            ProductSearchQueryBuilder queryBuilder,
+            ProductSearchFacetBuilder facetBuilder)
         {
             _client = client;
             _openSearchSettings = openSearchSettings.Value;
             _searchSettings = searchSettings.Value;
+            _queryBuilder = queryBuilder;
+            _facetBuilder = facetBuilder;
         }
 
-        public async Task<ProductSearchResultDto> SearchProductsAsync(ProductSearchQuery query, CancellationToken cancellationToken = default)
+        public async Task<SearchResponseDto> SearchProductsAsync(ProductSearchQuery query, CancellationToken cancellationToken = default)
         {
             var normalizedQuery = Normalize(query);
             var from = (normalizedQuery.Page - 1) * normalizedQuery.PageSize;
@@ -43,20 +47,8 @@ namespace TrendplusProdavnica.Infrastructure.Search
                     .From(from)
                     .Size(normalizedQuery.PageSize)
                     .TrackTotalHits()
-                    .Query(queryDescriptor => BuildQuery(queryDescriptor, normalizedQuery))
-                    .Aggregations(aggregation => aggregation
-                        .Terms("brands", terms => terms.Field("brandName.keyword").Size(FacetBucketSize))
-                        .Terms("colors", terms => terms.Field("primaryColorName.keyword").Size(FacetBucketSize))
-                        .Terms("sizes", terms => terms.Field("availableSizes").Size(FacetBucketSize))
-                        .Filter("sale_true", filter => filter.Filter(filterQuery => filterQuery.Term(term => term
-                            .Field(field => field.IsOnSale)
-                            .Value(true))))
-                        .Filter("new_true", filter => filter.Filter(filterQuery => filterQuery.Term(term => term
-                            .Field(field => field.IsNew)
-                            .Value(true))))
-                        .Filter("stock_true", filter => filter.Filter(filterQuery => filterQuery.Term(term => term
-                            .Field(field => field.InStock)
-                            .Value(true)))));
+                    .Query(_queryBuilder.Build(normalizedQuery))
+                    .Aggregations(aggregation => _facetBuilder.BuildAggregations(aggregation, normalizedQuery));
 
                 return ApplySort(searchDescriptor, normalizedQuery.Sort, hasSearchText);
             }, cancellationToken);
@@ -67,17 +59,17 @@ namespace TrendplusProdavnica.Infrastructure.Search
                     $"Product search query failed: {response.ServerError?.ToString() ?? response.OriginalException?.Message}");
             }
 
-            var items = response.Documents
+            var products = response.Documents
                 .Select(MapItem)
                 .ToArray();
 
-            var facets = MapFacets(response.Aggregations);
-            var pagination = new ProductSearchPaginationDto(normalizedQuery.Page, normalizedQuery.PageSize, response.Total);
+            var facets = _facetBuilder.MapFacets(response.Aggregations, normalizedQuery);
 
-            return new ProductSearchResultDto(
+            return new SearchResponseDto(
+                products,
                 response.Total,
-                items,
-                pagination,
+                normalizedQuery.Page,
+                normalizedQuery.PageSize,
                 facets);
         }
 
@@ -96,7 +88,6 @@ namespace TrendplusProdavnica.Infrastructure.Search
             var response = await _client.SearchAsync<ProductSearchDocument>(descriptor => descriptor
                 .Index(_openSearchSettings.IndexName)
                 .Size(limit)
-                .AllIndices(false)
                 .Query(queryDescriptor => queryDescriptor.MultiMatch(multiMatch => multiMatch
                     .Query(normalizedText)
                     .Operator(Operator.Or)
@@ -117,29 +108,16 @@ namespace TrendplusProdavnica.Infrastructure.Search
 
             var items = response.Documents
                 .Distinct(new ProductSearchDocumentSlugComparer())
-                .Select(doc => new ProductAutocompleteItemDto(
-                    doc.ProductId,
-                    doc.Slug,
-                    doc.Name,
-                    doc.BrandName,
-                    doc.PrimaryImageUrl))
+                .Select(document => new ProductAutocompleteItemDto(
+                    document.ProductId,
+                    document.Slug,
+                    document.Name,
+                    document.BrandName,
+                    document.PrimaryImageUrl))
                 .Take(limit)
                 .ToArray();
 
             return new ProductAutocompleteResultDto(items);
-        }
-
-        private class ProductSearchDocumentSlugComparer : IEqualityComparer<ProductSearchDocument>
-        {
-            public bool Equals(ProductSearchDocument? x, ProductSearchDocument? y)
-            {
-                return x?.Slug == y?.Slug;
-            }
-
-            public int GetHashCode(ProductSearchDocument obj)
-            {
-                return obj.Slug.GetHashCode();
-            }
         }
 
         private ProductSearchQuery Normalize(ProductSearchQuery query)
@@ -157,88 +135,84 @@ namespace TrendplusProdavnica.Infrastructure.Search
             var sort = string.IsNullOrWhiteSpace(query.Sort)
                 ? "relevance"
                 : query.Sort.Trim().ToLowerInvariant();
+            var brands = NormalizeStrings(query.Brands);
+            var colors = NormalizeStrings(query.Colors);
+            var sizes = query.Sizes?
+                .Where(value => value > 0)
+                .Distinct()
+                .OrderBy(value => value)
+                .ToArray();
+            var availability = NormalizeAvailability(query.Availability, query.InStockOnly);
+
+            var minPrice = query.MinPrice.HasValue && query.MinPrice.Value >= 0
+                ? query.MinPrice
+                : null;
+            var maxPrice = query.MaxPrice.HasValue && query.MaxPrice.Value >= 0
+                ? query.MaxPrice
+                : null;
 
             return query with
             {
                 QueryText = text,
                 Page = page,
                 PageSize = pageSize,
+                Brands = brands.Length == 0 ? null : brands,
+                Colors = colors.Length == 0 ? null : colors,
+                Sizes = sizes is { Length: > 0 } ? sizes : null,
+                MinPrice = minPrice,
+                MaxPrice = maxPrice,
+                Availability = availability.Length == 0 ? null : availability,
+                InStockOnly = null,
                 Sort = sort
             };
         }
 
-        private static QueryContainer BuildQuery(
-            QueryContainerDescriptor<ProductSearchDocument> queryDescriptor,
-            ProductSearchQuery query)
+        private static string[] NormalizeStrings(string[]? values)
         {
-            var filters = new List<Func<QueryContainerDescriptor<ProductSearchDocument>, QueryContainer>>();
+            return values?
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? Array.Empty<string>();
+        }
 
-            if (!string.IsNullOrWhiteSpace(query.Brand))
+        private static string[] NormalizeAvailability(string[]? values, bool? inStockOnly)
+        {
+            var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (inStockOnly == true)
             {
-                var brand = query.Brand.Trim();
-                filters.Add(filter => filter.Term(term => term
-                    .Field("brandName.keyword")
-                    .Value(brand)));
+                normalized.Add(ProductSearchQueryBuilder.AvailabilityInStockValue);
             }
 
-            if (!string.IsNullOrWhiteSpace(query.Color))
+            if (values is not null)
             {
-                var color = query.Color.Trim();
-                filters.Add(filter => filter.Term(term => term
-                    .Field("primaryColorName.keyword")
-                    .Value(color)));
+                foreach (var value in values)
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        continue;
+                    }
+
+                    switch (value.Trim().ToLowerInvariant())
+                    {
+                        case "in_stock":
+                        case "instock":
+                        case "available":
+                        case "in-stock":
+                            normalized.Add(ProductSearchQueryBuilder.AvailabilityInStockValue);
+                            break;
+                        case "out_of_stock":
+                        case "outofstock":
+                        case "unavailable":
+                        case "out-of-stock":
+                            normalized.Add(ProductSearchQueryBuilder.AvailabilityOutOfStockValue);
+                            break;
+                    }
+                }
             }
 
-            if (query.Size.HasValue)
-            {
-                filters.Add(filter => filter.Term(term => term
-                    .Field(field => field.AvailableSizes)
-                    .Value((double)query.Size.Value)));
-            }
-
-            if (query.IsOnSale.HasValue)
-            {
-                filters.Add(filter => filter.Term(term => term
-                    .Field(field => field.IsOnSale)
-                    .Value(query.IsOnSale.Value)));
-            }
-
-            if (query.IsNew.HasValue)
-            {
-                filters.Add(filter => filter.Term(term => term
-                    .Field(field => field.IsNew)
-                    .Value(query.IsNew.Value)));
-            }
-
-            if (query.InStockOnly == true)
-            {
-                filters.Add(filter => filter.Term(term => term
-                    .Field(field => field.InStock)
-                    .Value(true)));
-            }
-
-            if (!string.IsNullOrWhiteSpace(query.QueryText))
-            {
-                return queryDescriptor.Bool(boolean => boolean
-                    .Must(must => must.MultiMatch(multiMatch => multiMatch
-                        .Query(query.QueryText)
-                        .Operator(Operator.And)
-                        .Fields(fields => fields
-                            .Field(field => field.Name, 4.0)
-                            .Field(field => field.ShortDescription, 1.5)
-                            .Field(field => field.SearchKeywords, 3.0)
-                            .Field("brandName", 2.0)
-                            .Field("primaryCategory", 1.5)
-                            .Field("secondaryCategories", 1.2))))
-                    .Filter(filters));
-            }
-
-            if (filters.Count == 0)
-            {
-                return queryDescriptor.MatchAll();
-            }
-
-            return queryDescriptor.Bool(boolean => boolean.Filter(filters));
+            return normalized.ToArray();
         }
 
         private static SearchDescriptor<ProductSearchDocument> ApplySort(
@@ -252,6 +226,9 @@ namespace TrendplusProdavnica.Infrastructure.Search
 
             return normalizedSort switch
             {
+                "popular" => descriptor.Sort(sortDescriptor => sortDescriptor
+                    .Descending(field => field.SortRank)
+                    .Descending(field => field.PublishedAtUtc)),
                 "newest" => descriptor.Sort(sortDescriptor => sortDescriptor
                     .Descending(field => field.PublishedAtUtc)
                     .Descending(field => field.SortRank)),
@@ -270,62 +247,6 @@ namespace TrendplusProdavnica.Infrastructure.Search
                     .Descending(field => field.SortRank)
                     .Descending(field => field.PublishedAtUtc))
             };
-        }
-
-        private static ProductSearchFacetsDto MapFacets(AggregateDictionary aggregations)
-        {
-            var brands = MapStringFacet(aggregations.Terms("brands"));
-            var colors = MapStringFacet(aggregations.Terms("colors"));
-            var sizes = MapDoubleFacet(aggregations.Terms<double>("sizes"));
-
-            var saleCount = aggregations.Filter("sale_true")?.DocCount ?? 0;
-            var newCount = aggregations.Filter("new_true")?.DocCount ?? 0;
-            var stockCount = aggregations.Filter("stock_true")?.DocCount ?? 0;
-
-            return new ProductSearchFacetsDto(
-                brands,
-                colors,
-                sizes,
-                new[] { new SearchFacetOptionDto("true", saleCount) },
-                new[] { new SearchFacetOptionDto("true", newCount) },
-                new[] { new SearchFacetOptionDto("true", stockCount) });
-        }
-
-        private static SearchFacetOptionDto[] MapStringFacet(TermsAggregate<string>? aggregate)
-        {
-            if (aggregate?.Buckets is null)
-            {
-                return Array.Empty<SearchFacetOptionDto>();
-            }
-
-            return aggregate.Buckets
-                .Where(bucket => !string.IsNullOrWhiteSpace(bucket.Key))
-                .Select(bucket => new SearchFacetOptionDto(
-                    bucket.Key!,
-                    bucket.DocCount ?? 0))
-                .OrderByDescending(option => option.Count)
-                .ThenBy(option => option.Value)
-                .ToArray();
-        }
-
-        private static SearchFacetOptionDto[] MapDoubleFacet(TermsAggregate<double>? aggregate)
-        {
-            if (aggregate?.Buckets is null)
-            {
-                return Array.Empty<SearchFacetOptionDto>();
-            }
-
-            return aggregate.Buckets
-                .Select(bucket => new SearchFacetOptionDto(
-                    bucket.Key.ToString("0.#", CultureInfo.InvariantCulture),
-                    bucket.DocCount ?? 0))
-                .OrderBy(option =>
-                {
-                    return decimal.TryParse(option.Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
-                        ? parsed
-                        : decimal.MaxValue;
-                })
-                .ToArray();
         }
 
         private static ProductSearchItemDto MapItem(ProductSearchDocument document)
@@ -356,6 +277,19 @@ namespace TrendplusProdavnica.Infrastructure.Search
         private static decimal? ToDecimal(double? value)
         {
             return value.HasValue ? (decimal)value.Value : null;
+        }
+
+        private sealed class ProductSearchDocumentSlugComparer : IEqualityComparer<ProductSearchDocument>
+        {
+            public bool Equals(ProductSearchDocument? x, ProductSearchDocument? y)
+            {
+                return x?.Slug == y?.Slug;
+            }
+
+            public int GetHashCode(ProductSearchDocument obj)
+            {
+                return obj.Slug.GetHashCode();
+            }
         }
     }
 }

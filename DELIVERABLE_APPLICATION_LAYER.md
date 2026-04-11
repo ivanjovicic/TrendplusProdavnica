@@ -155,13 +155,13 @@ public static IServiceCollection AddApplicationServices(this IServiceCollection 
 | Screen | Feature | Primary DTO | Status |
 |--------|---------|-------------|--------|
 | **GET /** | Home | `HomePageDto` | ✅ Ready |
-| **GET /kategorija/{slug}** | PLP | `ProductListingPageDto` | ✅ Ready |
-| **GET /brend/{slug}** | PLP | `ProductListingPageDto` | ✅ Ready |
-| **GET /kolekcija/{slug}** | PLP | `ProductListingPageDto` | ✅ Ready |
+| **GET /{categorySlug}** | PLP | `ProductListingPageDto` | ✅ Ready |
+| **GET /brendovi/{slug}** | PLP | `ProductListingPageDto` | ✅ Ready |
+| **GET /kolekcije/{slug}** | PLP | `ProductListingPageDto` | ✅ Ready |
 | **GET /sale** | PLP | `ProductListingPageDto` | ✅ Ready |
 | **GET /proizvod/{slug}** | PDP | `ProductDetailDto` | ✅ Ready |
-| **GET /brend/{slug}** | Brand | `BrandPageDto` | ✅ Ready |
-| **GET /kolekcija/{slug}** | Collection | `CollectionPageDto` | ✅ Ready |
+| **GET /brendovi/{slug}** | Brand | `BrandPageDto` | ✅ Ready |
+| **GET /kolekcije/{slug}** | Collection | `CollectionPageDto` | ✅ Ready |
 | **GET /blog** | Editorial | `EditorialArticleCardDto[]` | ✅ Ready |
 | **GET /blog/{slug}** | Editorial | `EditorialArticleDto` | ✅ Ready |
 | **GET /prodavnice** | Stores | `StoreCardDto[]` | ✅ Ready |

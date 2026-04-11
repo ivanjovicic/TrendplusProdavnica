@@ -9,519 +9,124 @@ using TrendplusProdavnica.Application.Catalog.Dtos;
 using TrendplusProdavnica.Application.Catalog.Queries;
 using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Application.Content.Dtos;
-using TrendplusProdavnica.Domain.Catalog;
 using TrendplusProdavnica.Infrastructure.Persistence;
+using CatalogListing = TrendplusProdavnica.Application.Catalog.Listing;
 
 namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
 {
-    public class ProductListingQueryService : IProductListingQueryService
+    public sealed class ProductListingQueryService : IProductListingQueryService
     {
-        private readonly TrendplusDbContext _db;
+        private static readonly ListingSortOptionDto[] SortOptions =
+        {
+            new("Preporuceno", "recommended"),
+            new("Najnovije", "newest"),
+            new("Cena: niza ka visoj", "price_asc"),
+            new("Cena: visa ka nizoj", "price_desc"),
+            new("Bestseller", "bestsellers")
+        };
 
-        public ProductListingQueryService(TrendplusDbContext db)
+        private readonly TrendplusDbContext _db;
+        private readonly CatalogListing.IProductListingReadService _listingReadService;
+
+        public ProductListingQueryService(
+            TrendplusDbContext db,
+            CatalogListing.IProductListingReadService listingReadService)
         {
             _db = db;
+            _listingReadService = listingReadService;
         }
 
         public Task<ProductListingPageDto> GetCategoryListingAsync(GetCategoryListingQuery query)
-            => BuildListingAsync(query, ListingScope.Category);
+            => BuildListingAsync(ListingRequest.ForCategory(query));
 
         public Task<ProductListingPageDto> GetBrandListingAsync(GetBrandListingQuery query)
-            => BuildListingAsync(ToListingQuery(query), ListingScope.Brand);
+            => BuildListingAsync(ListingRequest.ForBrand(query));
 
         public Task<ProductListingPageDto> GetCollectionListingAsync(GetCollectionListingQuery query)
-            => BuildListingAsync(ToListingQuery(query), ListingScope.Collection);
+            => BuildListingAsync(ListingRequest.ForCollection(query));
 
         public Task<ProductListingPageDto> GetSaleListingAsync(GetSaleListingQuery query)
+            => BuildListingAsync(ListingRequest.ForSale(query));
+
+        private async Task<ProductListingPageDto> BuildListingAsync(ListingRequest request)
         {
-            // If CategorySlug is provided, treat it as a category listing with sale filter
-            if (!string.IsNullOrEmpty(query.CategorySlug))
-            {
-                var categoryQuery = new GetCategoryListingQuery(
-                    query.CategorySlug,
-                    query.Page,
-                    query.PageSize,
-                    query.Sort,
-                    query.Sizes,
-                    query.Colors,
-                    query.Brands,
-                    query.PriceFrom,
-                    query.PriceTo,
-                    IsOnSale: true, // Force sale filter
-                    query.IsNew,
-                    query.InStockOnly);
-                return BuildListingAsync(categoryQuery, ListingScope.Category);
-            }
-
-            return BuildListingAsync(ToListingQuery(query), ListingScope.Sale);
-        }
-
-        private static GetCategoryListingQuery ToListingQuery(GetBrandListingQuery query)
-            => new(
-                query.Slug,
-                query.Page,
-                query.PageSize,
-                query.Sort,
-                query.Sizes,
-                query.Colors,
-                query.Brands,
-                query.PriceFrom,
-                query.PriceTo,
-                query.IsOnSale,
-                query.IsNew,
-                query.InStockOnly);
-
-        private static GetCategoryListingQuery ToListingQuery(GetCollectionListingQuery query)
-            => new(
-                query.Slug,
-                query.Page,
-                query.PageSize,
-                query.Sort,
-                query.Sizes,
-                query.Colors,
-                query.Brands,
-                query.PriceFrom,
-                query.PriceTo,
-                query.IsOnSale,
-                query.IsNew,
-                query.InStockOnly);
-
-        private static GetCategoryListingQuery ToListingQuery(GetSaleListingQuery query)
-            => new(
-                "sale",
-                query.Page,
-                query.PageSize,
-                query.Sort,
-                query.Sizes,
-                query.Colors,
-                query.Brands,
-                query.PriceFrom,
-                query.PriceTo,
-                query.IsOnSale,
-                query.IsNew,
-                query.InStockOnly);
-
-        private async Task<ProductListingPageDto> BuildListingAsync(GetCategoryListingQuery query, ListingScope scope)
-        {
-            var page = Math.Max(1, query.Page);
-            var pageSize = query.PageSize <= 0 ? 24 : Math.Min(query.PageSize, 100);
-
-            var context = await ResolveScopeContextAsync(scope, query.Slug);
-            var baseProducts = BuildScopedProductsQuery(scope, context);
-            var filteredProducts = ApplyListingFilters(baseProducts, query, scope);
-            var sortedProducts = ApplySort(filteredProducts, query.Sort);
-
-            var totalItems = await filteredProducts.LongCountAsync();
-            var projections = ProductQueryMappingHelper.ToProductCardProjection(
-                sortedProducts,
-                _db.Brands.AsNoTracking());
-
-            var productCards = await projections
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToArrayAsync();
-
-            var facets = await BuildFacetsAsync(filteredProducts, query);
-            var appliedFilters = await BuildAppliedFiltersAsync(query, scope, context);
+            var context = await ResolveScopeContextAsync(request.Scope, request.Slug);
+            var response = await _listingReadService.GetProductsAsync(ToReadQuery(request));
 
             return new ProductListingPageDto(
                 context.Title,
-                context.Description,
-                context.Seo,
-                context.Breadcrumbs,
-                context.IntroTitle,
+                context.Slug,
                 context.IntroText,
-                ProductQueryMappingHelper.ToProductCardDtos(productCards),
-                facets,
-                appliedFilters,
-                new PaginationDto(page, pageSize, totalItems),
+                context.Breadcrumbs,
+                response.Products.Select(MapProductCard).ToArray(),
+                response.TotalCount,
+                response.Page,
+                response.PageSize,
+                SortOptions,
+                MapAvailableFilters(response.Facets),
                 context.MerchBlocks,
-                context.Faq);
+                context.Faq,
+                context.Seo with { CanonicalUrl = response.CanonicalUrl });
         }
 
-        private IQueryable<Product> BuildScopedProductsQuery(ListingScope scope, ListingContext context)
+        private static CatalogListing.ProductListingQuery ToReadQuery(ListingRequest request)
         {
-            var products = ProductQueryMappingHelper
-                .ApplyBaseProductVisibility(_db.Products.AsNoTracking());
-
-            return scope switch
-            {
-                ListingScope.Category => products.Where(product =>
-                    product.PrimaryCategoryId == context.ScopeId ||
-                    product.CategoryMaps.Any(map => map.CategoryId == context.ScopeId)),
-                ListingScope.Brand => products.Where(product => product.BrandId == context.ScopeId),
-                ListingScope.Collection => products.Where(product =>
-                    product.CollectionMaps.Any(map => map.CollectionId == context.ScopeId)),
-                ListingScope.Sale => products.Where(product =>
-                    product.Variants.Any(variant =>
-                        variant.IsActive &&
-                        variant.IsVisible &&
-                        variant.OldPrice.HasValue &&
-                        variant.OldPrice.Value > variant.Price)),
-                _ => products
-            };
+            return new CatalogListing.ProductListingQuery(
+                request.Scope is ListingScope.Category or ListingScope.SaleCategory ? request.Slug : null,
+                request.Scope == ListingScope.Brand ? request.Slug : null,
+                request.Scope == ListingScope.Collection ? request.Slug : null,
+                request.PriceFrom,
+                request.PriceTo,
+                request.Sizes?.Select(size => Convert.ToDecimal(size, CultureInfo.InvariantCulture)).ToArray(),
+                request.Colors,
+                request.Brands,
+                request.IsOnSale,
+                request.IsNew,
+                request.InStockOnly,
+                request.Page,
+                request.PageSize,
+                request.Sort);
         }
 
-        private static IQueryable<Product> ApplyListingFilters(
-            IQueryable<Product> products,
-            GetCategoryListingQuery query,
-            ListingScope scope)
+        private static ProductCardDto MapProductCard(CatalogListing.ProductCardDto product)
         {
-            if (query.Brands is { Length: > 0 })
-            {
-                products = products.Where(product => query.Brands!.Contains(product.BrandId));
-            }
-
-            if (query.Sizes is { Length: > 0 })
-            {
-                var requestedSizes = query.Sizes
-                    .Select(size => Convert.ToDecimal(size, CultureInfo.InvariantCulture))
-                    .ToArray();
-
-                products = products.Where(product => product.Variants.Any(variant =>
-                    variant.IsActive &&
-                    variant.IsVisible &&
-                    requestedSizes.Contains(variant.SizeEu)));
-            }
-
-            if (query.Colors is { Length: > 0 })
-            {
-                var colors = query.Colors
-                    .Where(color => !string.IsNullOrWhiteSpace(color))
-                    .Select(color => color.Trim().ToLowerInvariant())
-                    .Distinct()
-                    .ToArray();
-
-                if (colors.Length > 0)
-                {
-                    products = products.Where(product =>
-                        (product.PrimaryColorName != null && colors.Contains(product.PrimaryColorName.ToLower())) ||
-                        product.Variants.Any(variant =>
-                            variant.IsActive &&
-                            variant.IsVisible &&
-                            variant.ColorName != null &&
-                            colors.Contains(variant.ColorName.ToLower())));
-                }
-            }
-
-            if (query.PriceFrom.HasValue)
-            {
-                products = products.Where(product => product.Variants.Any(variant =>
-                    variant.IsActive &&
-                    variant.IsVisible &&
-                    variant.Price >= query.PriceFrom.Value));
-            }
-
-            if (query.PriceTo.HasValue)
-            {
-                products = products.Where(product => product.Variants.Any(variant =>
-                    variant.IsActive &&
-                    variant.IsVisible &&
-                    variant.Price <= query.PriceTo.Value));
-            }
-
-            if (query.IsOnSale == true || scope == ListingScope.Sale)
-            {
-                products = products.Where(product => product.Variants.Any(variant =>
-                    variant.IsActive &&
-                    variant.IsVisible &&
-                    variant.OldPrice.HasValue &&
-                    variant.OldPrice.Value > variant.Price));
-            }
-
-            if (query.IsNew == true)
-            {
-                products = products.Where(product => product.IsNew);
-            }
-
-            if (query.InStockOnly == true)
-            {
-                products = products.Where(product => product.Variants.Any(variant =>
-                    variant.IsActive &&
-                    variant.IsVisible &&
-                    variant.TotalStock > 0));
-            }
-
-            return products;
+            return new ProductCardDto(
+                product.ProductId,
+                product.Slug,
+                product.BrandName,
+                product.Name,
+                product.PrimaryImageUrl,
+                product.SecondaryImageUrl,
+                product.Price,
+                product.OldPrice,
+                "RSD",
+                ProductQueryMappingHelper.BuildBadges(product.IsNew, product.IsBestseller, product.IsOnSale),
+                product.AvailableSizesCount > 0,
+                product.AvailableSizesCount,
+                product.Color,
+                product.IsNew,
+                product.IsBestseller,
+                product.IsOnSale);
         }
 
-        private static IQueryable<Product> ApplySort(IQueryable<Product> products, string? sort)
+        private static ListingAvailableFiltersDto MapAvailableFilters(CatalogListing.ProductListingFacets facets)
         {
-            var normalizedSort = sort?.Trim().ToLowerInvariant();
-
-            return normalizedSort switch
-            {
-                "newest" => products
-                    .OrderByDescending(product => product.PublishedAtUtc)
-                    .ThenByDescending(product => product.Id),
-                "price_asc" => products
-                    .OrderBy(product => product.Variants
-                        .Where(variant => variant.IsActive && variant.IsVisible)
-                        .Select(variant => variant.Price)
-                        .DefaultIfEmpty(decimal.MaxValue)
-                        .Min())
-                    .ThenByDescending(product => product.SortRank),
-                "price_desc" => products
-                    .OrderByDescending(product => product.Variants
-                        .Where(variant => variant.IsActive && variant.IsVisible)
-                        .Select(variant => variant.Price)
-                        .DefaultIfEmpty(0m)
-                        .Min())
-                    .ThenByDescending(product => product.SortRank),
-                "bestsellers" => products
-                    .OrderByDescending(product => product.IsBestseller)
-                    .ThenByDescending(product => product.SortRank)
-                    .ThenByDescending(product => product.PublishedAtUtc),
-                _ => products
-                    .OrderByDescending(product => product.SortRank)
-                    .ThenByDescending(product => product.IsBestseller)
-                    .ThenByDescending(product => product.PublishedAtUtc)
-                    .ThenByDescending(product => product.Id)
-            };
+            return new ListingAvailableFiltersDto(
+                facets.Brands.Select(item => item.BrandName).ToArray(),
+                facets.Colors.Select(item => item.Color).ToArray(),
+                facets.Sizes.Select(item => item.Size).ToArray(),
+                new ListingPriceRangeDto(facets.PriceRange.Min, facets.PriceRange.Max));
         }
 
-        private async Task<FilterFacetDto[]> BuildFacetsAsync(
-            IQueryable<Product> filteredProducts,
-            GetCategoryListingQuery query)
-        {
-            var selectedSizes = new HashSet<long>(query.Sizes ?? Array.Empty<long>());
-            var selectedColors = new HashSet<string>(
-                (query.Colors ?? Array.Empty<string>())
-                    .Where(color => !string.IsNullOrWhiteSpace(color))
-                    .Select(color => color.Trim().ToLowerInvariant()));
-            var selectedBrands = new HashSet<long>(query.Brands ?? Array.Empty<long>());
-
-            var sizeRows = await filteredProducts
-                .SelectMany(product => product.Variants
-                    .Where(variant => variant.IsActive && variant.IsVisible)
-                    .Select(variant => new { product.Id, variant.SizeEu }))
-                .Distinct()
-                .GroupBy(row => row.SizeEu)
-                .Select(group => new
-                {
-                    Size = group.Key,
-                    Count = group.Count()
-                })
-                .OrderBy(row => row.Size)
-                .ToArrayAsync();
-
-            var colorRows = await filteredProducts
-                .SelectMany(product => product.Variants
-                    .Where(variant => variant.IsActive && variant.IsVisible)
-                    .Select(variant => new
-                    {
-                        product.Id,
-                        Color = (variant.ColorName ?? product.PrimaryColorName) ?? string.Empty
-                    }))
-                .Where(row => row.Color != string.Empty)
-                .Distinct()
-                .GroupBy(row => row.Color)
-                .Select(group => new
-                {
-                    Color = group.Key,
-                    Count = group.Count()
-                })
-                .OrderBy(row => row.Color)
-                .ToArrayAsync();
-
-            var brandRows = await (
-                from product in filteredProducts
-                join brand in _db.Brands.AsNoTracking() on product.BrandId equals brand.Id
-                group product by new { brand.Id, brand.Name } into grouped
-                orderby grouped.Key.Name
-                select new
-                {
-                    BrandId = grouped.Key.Id,
-                    BrandName = grouped.Key.Name,
-                    Count = grouped.Count()
-                })
-                .ToArrayAsync();
-
-            var saleCount = await filteredProducts.CountAsync(product => product.Variants.Any(variant =>
-                variant.IsActive &&
-                variant.IsVisible &&
-                variant.OldPrice.HasValue &&
-                variant.OldPrice.Value > variant.Price));
-
-            var newCount = await filteredProducts.CountAsync(product => product.IsNew);
-
-            var stockCount = await filteredProducts.CountAsync(product => product.Variants.Any(variant =>
-                variant.IsActive &&
-                variant.IsVisible &&
-                variant.TotalStock > 0));
-
-            return new FilterFacetDto[]
-            {
-                new(
-                    "sizes",
-                    "Velicine",
-                    "multi",
-                    sizeRows
-                        .Select(row => new FilterOptionDto(
-                            row.Size.ToString("0.#", CultureInfo.InvariantCulture),
-                            row.Size.ToString("0.#", CultureInfo.InvariantCulture),
-                            row.Count,
-                            decimal.Truncate(row.Size) == row.Size &&
-                            selectedSizes.Contains((long)row.Size),
-                            row.Count == 0))
-                        .ToArray()),
-                new(
-                    "colors",
-                    "Boje",
-                    "multi",
-                    colorRows
-                        .Select(row => new FilterOptionDto(
-                            row.Color,
-                            row.Color,
-                            row.Count,
-                            selectedColors.Contains(row.Color.ToLowerInvariant()),
-                            row.Count == 0))
-                        .ToArray()),
-                new(
-                    "brands",
-                    "Brendovi",
-                    "multi",
-                    brandRows
-                        .Select(row => new FilterOptionDto(
-                            row.BrandId.ToString(CultureInfo.InvariantCulture),
-                            row.BrandName,
-                            row.Count,
-                            selectedBrands.Contains(row.BrandId),
-                            row.Count == 0))
-                        .ToArray()),
-                new(
-                    "sale",
-                    "Akcija",
-                    "boolean",
-                    new[]
-                    {
-                        new FilterOptionDto(
-                            "true",
-                            "Na akciji",
-                            saleCount,
-                            query.IsOnSale == true,
-                            saleCount == 0)
-                    }),
-                new(
-                    "new",
-                    "Novo",
-                    "boolean",
-                    new[]
-                    {
-                        new FilterOptionDto(
-                            "true",
-                            "Novo",
-                            newCount,
-                            query.IsNew == true,
-                            newCount == 0)
-                    }),
-                new(
-                    "stock",
-                    "Na stanju",
-                    "boolean",
-                    new[]
-                    {
-                        new FilterOptionDto(
-                            "true",
-                            "Na stanju",
-                            stockCount,
-                            query.InStockOnly == true,
-                            stockCount == 0)
-                    })
-            };
-        }
-
-        private async Task<AppliedFilterDto[]> BuildAppliedFiltersAsync(
-            GetCategoryListingQuery query,
-            ListingScope scope,
-            ListingContext context)
-        {
-            var filters = new List<AppliedFilterDto>();
-
-            if (scope == ListingScope.Category)
-            {
-                filters.Add(new AppliedFilterDto("category", "Kategorija", context.Slug, context.Title));
-            }
-            else if (scope == ListingScope.Brand)
-            {
-                filters.Add(new AppliedFilterDto("brandScope", "Brend", context.Slug, context.Title));
-            }
-            else if (scope == ListingScope.Collection)
-            {
-                filters.Add(new AppliedFilterDto("collection", "Kolekcija", context.Slug, context.Title));
-            }
-            else if (scope == ListingScope.Sale)
-            {
-                filters.Add(new AppliedFilterDto("saleScope", "Akcija", "true", "Akcija"));
-            }
-
-            if (query.Sizes is { Length: > 0 })
-            {
-                filters.AddRange(query.Sizes.Select(size => new AppliedFilterDto(
-                    "size",
-                    "Velicina",
-                    size.ToString(CultureInfo.InvariantCulture),
-                    size.ToString(CultureInfo.InvariantCulture))));
-            }
-
-            if (query.Colors is { Length: > 0 })
-            {
-                filters.AddRange(query.Colors
-                    .Where(color => !string.IsNullOrWhiteSpace(color))
-                    .Select(color => new AppliedFilterDto("color", "Boja", color, color)));
-            }
-
-            if (query.Brands is { Length: > 0 })
-            {
-                var selectedBrandIds = query.Brands.Distinct().ToArray();
-                var selectedBrands = await _db.Brands.AsNoTracking()
-                    .Where(brand => selectedBrandIds.Contains(brand.Id))
-                    .Select(brand => new { brand.Id, brand.Name })
-                    .ToDictionaryAsync(brand => brand.Id, brand => brand.Name);
-
-                filters.AddRange(selectedBrandIds.Select(brandId => new AppliedFilterDto(
-                    "brand",
-                    "Brend",
-                    brandId.ToString(CultureInfo.InvariantCulture),
-                    selectedBrands.TryGetValue(brandId, out var brandName)
-                        ? brandName
-                        : brandId.ToString(CultureInfo.InvariantCulture))));
-            }
-
-            if (query.PriceFrom.HasValue || query.PriceTo.HasValue)
-            {
-                var fromText = query.PriceFrom?.ToString("0.##", CultureInfo.InvariantCulture) ?? "0";
-                var toText = query.PriceTo?.ToString("0.##", CultureInfo.InvariantCulture) ?? "max";
-                var display = $"{fromText} - {toText}";
-                filters.Add(new AppliedFilterDto("price", "Cena", display, display));
-            }
-
-            if (query.IsOnSale == true)
-            {
-                filters.Add(new AppliedFilterDto("isOnSale", "Akcija", "true", "Na akciji"));
-            }
-
-            if (query.IsNew == true)
-            {
-                filters.Add(new AppliedFilterDto("isNew", "Novo", "true", "Novo"));
-            }
-
-            if (query.InStockOnly == true)
-            {
-                filters.Add(new AppliedFilterDto("inStockOnly", "Na stanju", "true", "Na stanju"));
-            }
-
-            return filters.ToArray();
-        }
-
-        private async Task<ListingContext> ResolveScopeContextAsync(ListingScope scope, string slug)
+        private async Task<ListingContext> ResolveScopeContextAsync(ListingScope scope, string? slug)
         {
             return scope switch
             {
-                ListingScope.Category => await BuildCategoryContextAsync(slug),
-                ListingScope.Brand => await BuildBrandContextAsync(slug),
-                ListingScope.Collection => await BuildCollectionContextAsync(slug),
+                ListingScope.Category => await BuildCategoryContextAsync(slug ?? string.Empty),
+                ListingScope.Brand => await BuildBrandContextAsync(slug ?? string.Empty),
+                ListingScope.Collection => await BuildCollectionContextAsync(slug ?? string.Empty),
                 ListingScope.Sale => await BuildSaleContextAsync(),
+                ListingScope.SaleCategory => await BuildSaleCategoryContextAsync(slug ?? string.Empty),
                 _ => throw new KeyNotFoundException("Listing scope is not supported.")
             };
         }
@@ -564,13 +169,10 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             var breadcrumbs = await BuildCategoryBreadcrumbsAsync(category.Id);
 
             return new ListingContext(
-                category.Id,
                 category.Slug,
                 category.Name,
-                description,
-                seo,
-                content?.IntroTitle,
                 introText,
+                seo,
                 MapMerchBlocks(content?.MerchBlocks),
                 MapFaq(content?.Faq),
                 breadcrumbs);
@@ -614,20 +216,17 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             var seo = ProductQueryMappingHelper.MapSeo(content?.Seo ?? brand.Seo, brand.Name, description);
 
             return new ListingContext(
-                brand.Id,
                 brand.Slug,
                 brand.Name,
-                description,
-                seo,
-                content?.IntroTitle,
                 introText,
+                seo,
                 MapMerchBlocks(content?.MerchBlocks),
                 MapFaq(content?.Faq),
                 new[]
                 {
                     new BreadcrumbItemDto("Pocetna", "/"),
                     new BreadcrumbItemDto("Brendovi", "/brendovi"),
-                    new BreadcrumbItemDto(brand.Name, $"/brend/{brand.Slug}")
+                    new BreadcrumbItemDto(brand.Name, $"/brendovi/{brand.Slug}")
                 });
         }
 
@@ -669,20 +268,17 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
             var seo = ProductQueryMappingHelper.MapSeo(content?.Seo ?? collection.Seo, collection.Name, description);
 
             return new ListingContext(
-                collection.Id,
                 collection.Slug,
                 collection.Name,
-                description,
-                seo,
-                content?.IntroTitle,
                 introText,
+                seo,
                 MapMerchBlocks(content?.MerchBlocks),
                 MapFaq(content?.Faq),
                 new[]
                 {
                     new BreadcrumbItemDto("Pocetna", "/"),
                     new BreadcrumbItemDto("Kolekcije", "/kolekcije"),
-                    new BreadcrumbItemDto(collection.Name, $"/kolekcija/{collection.Slug}")
+                    new BreadcrumbItemDto(collection.Name, $"/kolekcije/{collection.Slug}")
                 });
         }
 
@@ -703,23 +299,72 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 .FirstOrDefaultAsync();
 
             var title = page?.Title ?? "Akcija";
-            var description = page?.Subtitle ?? string.Empty;
+            var introText = page?.IntroText ?? page?.Subtitle ?? "Aktuelni snizeni proizvodi.";
+            var description = page?.Subtitle ?? "Aktuelni snizeni proizvodi.";
             var seo = ProductQueryMappingHelper.MapSeo(page?.Seo, title, description);
 
             return new ListingContext(
-                0L,
-                page?.Slug ?? "sale",
+                page?.Slug ?? "akcija",
                 title,
-                description,
+                introText,
                 seo,
-                title,
-                page?.IntroText,
                 Array.Empty<object>(),
                 MapFaq(page?.Faq),
                 new[]
                 {
                     new BreadcrumbItemDto("Pocetna", "/"),
                     new BreadcrumbItemDto("Akcija", "/akcija")
+                });
+        }
+
+        private async Task<ListingContext> BuildSaleCategoryContextAsync(string slug)
+        {
+            var category = await _db.Categories.AsNoTracking()
+                .Where(entity => entity.Slug == slug && entity.IsActive)
+                .Select(entity => new
+                {
+                    entity.Id,
+                    entity.Name,
+                    entity.Slug,
+                    entity.ShortDescription,
+                    entity.Seo
+                })
+                .FirstOrDefaultAsync();
+
+            if (category is null)
+            {
+                throw new KeyNotFoundException($"Category '{slug}' was not found.");
+            }
+
+            var content = await _db.CategoryPageContents.AsNoTracking()
+                .Where(entity => entity.CategoryId == category.Id && entity.IsPublished)
+                .Select(entity => new
+                {
+                    entity.IntroTitle,
+                    entity.IntroText,
+                    entity.SeoText,
+                    entity.Seo,
+                    entity.MerchBlocks,
+                    entity.Faq
+                })
+                .FirstOrDefaultAsync();
+
+            var introText = content?.IntroText ?? category.ShortDescription ?? $"Snizeni proizvodi u kategoriji {category.Name}.";
+            var description = content?.SeoText ?? category.ShortDescription ?? $"Snizeni proizvodi u kategoriji {category.Name}.";
+            var seo = ProductQueryMappingHelper.MapSeo(content?.Seo ?? category.Seo, $"Akcija - {category.Name}", description);
+
+            return new ListingContext(
+                category.Slug,
+                category.Name,
+                introText,
+                seo,
+                MapMerchBlocks(content?.MerchBlocks),
+                MapFaq(content?.Faq),
+                new[]
+                {
+                    new BreadcrumbItemDto("Pocetna", "/"),
+                    new BreadcrumbItemDto("Akcija", "/akcija"),
+                    new BreadcrumbItemDto(category.Name, $"/akcija/{category.Slug}")
                 });
         }
 
@@ -763,11 +408,11 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 new("Pocetna", "/")
             };
 
-            breadcrumbs.AddRange(chain.Select(item => new BreadcrumbItemDto(item.Name, $"/kategorija/{item.Slug}")));
+            breadcrumbs.AddRange(chain.Select(item => new BreadcrumbItemDto(item.Name, $"/kategorije/{item.Slug}")));
             return breadcrumbs.ToArray();
         }
 
-        private static object[] MapMerchBlocks(IEnumerable<Domain.ValueObjects.MerchBlock>? merchBlocks)
+        private static object[] MapMerchBlocks(IEnumerable<TrendplusProdavnica.Domain.ValueObjects.MerchBlock>? merchBlocks)
         {
             if (merchBlocks is null)
             {
@@ -782,7 +427,7 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
                 .ToArray();
         }
 
-        private static object? MapFaq(IEnumerable<Domain.ValueObjects.FaqItem>? faqItems)
+        private static object? MapFaq(IEnumerable<TrendplusProdavnica.Domain.ValueObjects.FaqItem>? faqItems)
         {
             if (faqItems is null)
             {
@@ -797,23 +442,110 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Queries.Catalog
         }
 
         private sealed record ListingContext(
-            long ScopeId,
             string Slug,
             string Title,
-            string Description,
-            SeoDto Seo,
-            string? IntroTitle,
             string? IntroText,
+            SeoDto Seo,
             object[] MerchBlocks,
             object? Faq,
             BreadcrumbItemDto[] Breadcrumbs);
+
+        private sealed record ListingRequest(
+            ListingScope Scope,
+            string? Slug,
+            int Page,
+            int PageSize,
+            string? Sort,
+            long[]? Sizes,
+            string[]? Colors,
+            long[]? Brands,
+            decimal? PriceFrom,
+            decimal? PriceTo,
+            bool? IsOnSale,
+            bool? IsNew,
+            bool? InStockOnly)
+        {
+            public static ListingRequest ForCategory(GetCategoryListingQuery query)
+                => new(
+                    ListingScope.Category,
+                    query.Slug,
+                    query.Page,
+                    query.PageSize,
+                    query.Sort,
+                    query.Sizes,
+                    query.Colors,
+                    query.Brands,
+                    query.PriceFrom,
+                    query.PriceTo,
+                    query.IsOnSale,
+                    query.IsNew,
+                    query.InStockOnly);
+
+            public static ListingRequest ForBrand(GetBrandListingQuery query)
+                => new(
+                    ListingScope.Brand,
+                    query.Slug,
+                    query.Page,
+                    query.PageSize,
+                    query.Sort,
+                    query.Sizes,
+                    query.Colors,
+                    query.Brands,
+                    query.PriceFrom,
+                    query.PriceTo,
+                    query.IsOnSale,
+                    query.IsNew,
+                    query.InStockOnly);
+
+            public static ListingRequest ForCollection(GetCollectionListingQuery query)
+                => new(
+                    ListingScope.Collection,
+                    query.Slug,
+                    query.Page,
+                    query.PageSize,
+                    query.Sort,
+                    query.Sizes,
+                    query.Colors,
+                    query.Brands,
+                    query.PriceFrom,
+                    query.PriceTo,
+                    query.IsOnSale,
+                    query.IsNew,
+                    query.InStockOnly);
+
+            public static ListingRequest ForSale(GetSaleListingQuery query)
+                => new(
+                    string.IsNullOrWhiteSpace(query.CategorySlug) ? ListingScope.Sale : ListingScope.SaleCategory,
+                    query.CategorySlug,
+                    query.Page,
+                    query.PageSize,
+                    query.Sort,
+                    query.Sizes,
+                    query.Colors,
+                    query.Brands,
+                    query.PriceFrom,
+                    query.PriceTo,
+                    true,
+                    query.IsNew,
+                    query.InStockOnly);
+        }
+
+        public async Task<List<CategorySeoDto>> GetAllCategoriesForSeoAsync()
+        {
+            var categories = await _db.Categories
+                .AsNoTracking()
+                .Select(c => new CategorySeoDto(c.Slug, c.UpdatedAtUtc))
+                .ToListAsync();
+            return categories;
+        }
 
         private enum ListingScope
         {
             Category,
             Brand,
             Collection,
-            Sale
+            Sale,
+            SaleCategory
         }
     }
 }

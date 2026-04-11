@@ -55,6 +55,17 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
             public string[] PinnedCollectionSlugs { get; init; } = Array.Empty<string>();
         }
 
+        private sealed record ProductReviewSeed(
+            string ExternalKey,
+            string ProductSlug,
+            string AuthorName,
+            string? Title,
+            string ReviewBody,
+            decimal RatingValue,
+            bool IsVerifiedPurchase,
+            int PublishedDaysAgo,
+            ProductReviewStatus Status);
+
         private sealed record StoreSeed(
             string Name,
             string Slug,

@@ -20,9 +20,19 @@ namespace TrendplusProdavnica.Application.Cart.Services
         Task<CartDto?> GetCartAsync(string cartToken, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Get existing cart by session id (optionally user scoped).
+        /// </summary>
+        Task<CartDto?> GetCartBySessionAsync(string sessionId, string? userId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Add item to cart (or increase quantity if variant already in cart)
         /// </summary>
         Task<CartDto> AddItemAsync(string cartToken, AddToCartRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Add item to cart identified by session id.
+        /// </summary>
+        Task<CartDto> AddItemBySessionAsync(AddToCartBySessionRequest request, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Update quantity of an existing cart item
@@ -30,9 +40,19 @@ namespace TrendplusProdavnica.Application.Cart.Services
         Task<CartDto> UpdateItemQuantityAsync(string cartToken, long itemId, UpdateCartItemRequest request, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Update quantity by product variant in cart identified by session id.
+        /// </summary>
+        Task<CartDto> UpdateItemBySessionAsync(UpdateCartBySessionRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Remove item from cart
         /// </summary>
         Task<CartDto> RemoveItemAsync(string cartToken, long itemId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Remove item by product variant in cart identified by session id.
+        /// </summary>
+        Task<CartDto> RemoveItemBySessionAsync(RemoveFromCartRequest request, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Clear all items from cart

@@ -35,6 +35,18 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
             ProductRelationType RelationType,
             int SortOrder);
 
+        private sealed record ProductRatingSummarySeed(
+            long ProductId,
+            decimal AverageRating,
+            int ReviewCount,
+            int RatingCount,
+            int OneStarCount,
+            int TwoStarCount,
+            int ThreeStarCount,
+            int FourStarCount,
+            int FiveStarCount,
+            DateTimeOffset? LastReviewAtUtc);
+
         private sealed record VariantInventoryRow(
             string ProductSlug,
             long VariantId,
@@ -110,6 +122,66 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
                     index == 1 ? MediaRole.Listing : MediaRole.Gallery,
                     index,
                     index == 1));
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyList<ProductReviewSeed> BuildProductReviewSeeds(IReadOnlyList<ProductSeed> seeds)
+        {
+            var authors = new[]
+            {
+                "Ana",
+                "Milica",
+                "Jelena",
+                "Ivana",
+                "Tamara",
+                "Marija",
+                "Katarina",
+                "Sofija"
+            };
+
+            var positiveTitles = new[]
+            {
+                "Odlican izbor za svaki dan",
+                "Udoban model i lep izgled",
+                "Bas ono sto sam trazila",
+                "Preporuka za posao i grad"
+            };
+
+            var neutralTitles = new[]
+            {
+                "Lep model uz malu napomenu",
+                "Dobro iskustvo kupovine"
+            };
+
+            var result = new List<ProductReviewSeed>(seeds.Count * 3);
+
+            for (var productIndex = 0; productIndex < seeds.Count; productIndex++)
+            {
+                var seed = seeds[productIndex];
+                var reviewCount = seed.IsBestseller ? 4 : seed.IsNew ? 3 : 2;
+
+                for (var reviewIndex = 0; reviewIndex < reviewCount; reviewIndex++)
+                {
+                    var rating = ResolveReviewRating(seed, productIndex, reviewIndex);
+                    var isPositive = rating >= 4m;
+                    var authorName = authors[(productIndex + reviewIndex) % authors.Length];
+                    var titlePool = isPositive ? positiveTitles : neutralTitles;
+                    var title = titlePool[(productIndex + reviewIndex) % titlePool.Length];
+                    var reviewBody = BuildReviewBody(seed, rating, reviewIndex);
+
+                    result.Add(new ProductReviewSeed(
+                        $"{seed.Slug}-review-{reviewIndex + 1}",
+                        seed.Slug,
+                        authorName,
+                        title,
+                        reviewBody,
+                        rating,
+                        (productIndex + reviewIndex) % 2 == 0,
+                        seed.PublishedDaysAgo + (reviewIndex + 1) * 3,
+                        ProductReviewStatus.Published));
+                }
             }
 
             return result;
@@ -294,6 +366,40 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
             return result;
         }
 
+        private static IReadOnlyList<ProductRatingSummarySeed> BuildProductRatingSummaries(
+            IEnumerable<ProductReview> reviews,
+            DateTimeOffset now)
+        {
+            return reviews
+                .Where(review => review.Status == ProductReviewStatus.Published)
+                .GroupBy(review => review.ProductId)
+                .Select(group =>
+                {
+                    var publishedReviews = group
+                        .Where(review => review.PublishedAtUtc.HasValue)
+                        .OrderByDescending(review => review.PublishedAtUtc)
+                        .ToArray();
+
+                    var ratingCount = publishedReviews.Length;
+                    var averageRating = ratingCount == 0
+                        ? 0m
+                        : decimal.Round(publishedReviews.Average(review => review.RatingValue), 2, MidpointRounding.AwayFromZero);
+
+                    return new ProductRatingSummarySeed(
+                        group.Key,
+                        averageRating,
+                        ratingCount,
+                        ratingCount,
+                        publishedReviews.Count(review => review.RatingValue >= 1m && review.RatingValue < 2m),
+                        publishedReviews.Count(review => review.RatingValue >= 2m && review.RatingValue < 3m),
+                        publishedReviews.Count(review => review.RatingValue >= 3m && review.RatingValue < 4m),
+                        publishedReviews.Count(review => review.RatingValue >= 4m && review.RatingValue < 5m),
+                        publishedReviews.Count(review => review.RatingValue >= 5m),
+                        publishedReviews.FirstOrDefault()?.PublishedAtUtc ?? now);
+                })
+                .ToArray();
+        }
+
         private static (decimal MinPrice, decimal MaxPrice) ResolvePriceRange(string categorySlug)
         {
             return categorySlug switch
@@ -330,6 +436,40 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Seeding
                 2 => (StockStatus.LowStock, 2),
                 _ => (StockStatus.InStock, 4 + ((productIndex * 2 + variantIndex) % 9))
             };
+        }
+
+        private static decimal ResolveReviewRating(ProductSeed seed, int productIndex, int reviewIndex)
+        {
+            if (seed.IsBestseller)
+            {
+                return reviewIndex == 0 && productIndex % 4 == 0 ? 4m : 5m;
+            }
+
+            if (seed.IsNew)
+            {
+                return reviewIndex == 0 && productIndex % 5 == 0 ? 3m : 4m;
+            }
+
+            return (productIndex + reviewIndex) % 4 == 0 ? 3m : 4m;
+        }
+
+        private static string BuildReviewBody(ProductSeed seed, decimal rating, int reviewIndex)
+        {
+            var fitText = reviewIndex % 2 == 0
+                ? "Velicina odgovara ocekivanjima"
+                : "Model lepo lezi na nozi i ne zulja";
+
+            if (rating >= 5m)
+            {
+                return $"{seed.Name} je ostavio odlican utisak. {fitText}, a utisak udobnosti je vrlo dobar i posle vise sati nosenja.";
+            }
+
+            if (rating >= 4m)
+            {
+                return $"{seed.Name} je veoma dobar izbor za svakodnevne kombinacije. {fitText}, a izgled uzivo je kao na slikama.";
+            }
+
+            return $"{seed.Name} izgleda lepo i kvalitetno je izradjen. {fitText}, ali mi je trebalo malo vremena da se naviknem na model.";
         }
 
         private static string? NextSlugInGroup(IReadOnlyList<string> group, string currentSlug)

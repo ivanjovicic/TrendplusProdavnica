@@ -1,11 +1,16 @@
 #nullable enable
+using System;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrendplusProdavnica.Api.Infrastructure.Auth;
 using TrendplusProdavnica.Application.Admin.Dtos;
 using TrendplusProdavnica.Application.Admin.Services;
 using TrendplusProdavnica.Domain.Enums;
 
 namespace TrendplusProdavnica.Api.Controllers.Admin
 {
+    [Authorize(Policy = ApiAuthorizationPolicies.Admin)]
     [ApiController]
     [Route("api/admin/products")]
     public class ProductsAdminController : ControllerBase
@@ -18,15 +23,38 @@ namespace TrendplusProdavnica.Api.Controllers.Admin
         }
 
         [HttpGet]
-        public async Task<ActionResult<IReadOnlyList<ProductAdminListDto>>> GetList(
-            [FromQuery] long? brand,
-            [FromQuery] long? category,
-            [FromQuery] ProductStatus? status,
-            [FromQuery] bool? isNew,
-            [FromQuery] bool? isBestseller,
-            CancellationToken cancellationToken)
+        public async Task<ActionResult<AdminListResponse<ProductAdminListDto>>> GetList(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null,
+            [FromQuery] long? brand = null,
+            [FromQuery] long? category = null,
+            [FromQuery] ProductStatus? status = null,
+            [FromQuery] bool? isNew = null,
+            [FromQuery] bool? isBestseller = null,
+            CancellationToken cancellationToken = default)
         {
-            return Ok(await _service.GetListAsync(brand, category, status, isNew, isBestseller, cancellationToken));
+            var items = await _service.GetListAsync(brand, category, status, isNew, isBestseller, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                items = items
+                    .Where(item =>
+                        item.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                        item.Slug.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                        item.BrandName.Contains(search, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+            }
+
+            var pagedItems = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(new AdminListResponse<ProductAdminListDto>
+            {
+                Items = pagedItems,
+                TotalCount = items.Count,
+                Page = page,
+                PageSize = pageSize
+            });
         }
 
         [HttpGet("{id:long}")]
@@ -70,6 +98,12 @@ namespace TrendplusProdavnica.Api.Controllers.Admin
         public async Task<ActionResult<ProductAdminDetailDto>> Unarchive(long id, CancellationToken cancellationToken)
         {
             return Ok(await _service.UnarchiveToDraftAsync(id, cancellationToken));
+        }
+
+        [HttpDelete("{id:long}")]
+        public async Task<ActionResult<ProductAdminDetailDto>> Delete(long id, CancellationToken cancellationToken)
+        {
+            return Ok(await _service.ArchiveAsync(id, cancellationToken));
         }
     }
 }

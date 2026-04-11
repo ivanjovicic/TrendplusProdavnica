@@ -3,6 +3,7 @@ export interface SeoDto {
   seoTitle?: string;
   seoDescription?: string;
   canonicalUrl?: string;
+  alternateLanguageUrls?: Record<string, string>;
   robotsDirective?: string;
   ogTitle?: string;
   ogDescription?: string;
@@ -12,7 +13,7 @@ export interface SeoDto {
 
 export interface BreadcrumbItemDto {
   label: string;
-  slug: string;
+  slug?: string;
   url: string;
 }
 
@@ -33,8 +34,10 @@ export interface ProductMediaDto {
 }
 
 export interface ProductSizeOptionDto {
+  variantId?: number;
   sizeEu: number;
   sku: string;
+  barcode?: string;
   price: number;
   oldPrice?: number;
   currency: string;
@@ -47,6 +50,7 @@ export interface ProductSizeOptionDto {
 
 export interface ProductCardDto {
   id: number;
+  productId?: number;
   slug: string;
   name: string;
   subtitle?: string;
@@ -55,6 +59,7 @@ export interface ProductCardDto {
   brandName: string;
   primaryColorName?: string;
   primaryImageUrl?: string;
+  secondaryImageUrl?: string;
   price: number;
   oldPrice?: number;
   currency: string;
@@ -62,7 +67,24 @@ export interface ProductCardDto {
   isBestseller: boolean;
   isOnSale: boolean;
   availableSizes: number;
+  availableSizesCount?: number;
   isVisibleInStorefront: boolean;
+}
+
+export interface ProductAggregateRatingDto {
+  ratingValue: number;
+  reviewCount: number;
+  ratingCount?: number;
+  bestRating?: number;
+  worstRating?: number;
+}
+
+export interface ProductReviewDto {
+  authorName?: string;
+  title?: string;
+  reviewBody?: string;
+  ratingValue: number;
+  publishedAtUtc?: string;
 }
 
 export interface ProductdetailDto {
@@ -81,6 +103,10 @@ export interface ProductdetailDto {
   primaryColorName?: string;
   secondaryColorName?: string;
   sizeGuideId?: number;
+  sku?: string;
+  mpn?: string;
+  gtin?: string;
+  gtin13?: string;
   price: number;
   oldPrice?: number;
   currency: string;
@@ -89,6 +115,11 @@ export interface ProductdetailDto {
   isOnSale: boolean;
   media: ProductMediaDto[];
   sizes: ProductSizeOptionDto[];
+  aggregateRating?: ProductAggregateRatingDto;
+  averageRating?: number;
+  reviewCount?: number;
+  ratingCount?: number;
+  reviews?: ProductReviewDto[];
   deliveryInfo?: string;
   returnsInfo?: string;
   careInstructions?: string;
@@ -111,11 +142,82 @@ export interface ProductListingPageDto {
     brands?: string[];
     colors?: string[];
     sizes?: number[];
-    priceRange?: { min: number; max: number };
+    priceRange?: { min?: number; max?: number };
   };
-  merch?: string;
-  faq?: any;
+  merchBlocks?: unknown[];
+  faq?: unknown;
   seo?: SeoDto;
+}
+
+export interface SearchFacetValueDto {
+  value: string;
+  label: string;
+  count: number;
+  selected: boolean;
+}
+
+export interface SearchPriceRangeFacetDto {
+  min?: number;
+  max?: number;
+  selectedMin?: number;
+  selectedMax?: number;
+}
+
+export interface SearchFacetsDto {
+  brands: SearchFacetValueDto[];
+  sizes: SearchFacetValueDto[];
+  colors: SearchFacetValueDto[];
+  priceRange: SearchPriceRangeFacetDto;
+  availability: SearchFacetValueDto[];
+  sale: SearchFacetValueDto[];
+  new: SearchFacetValueDto[];
+}
+
+export interface SearchProductItemDto {
+  productId: number;
+  slug: string;
+  brandName: string;
+  name: string;
+  shortDescription?: string;
+  primaryCategory?: string;
+  secondaryCategories: string[];
+  primaryColorName?: string;
+  isNew: boolean;
+  isBestseller: boolean;
+  isOnSale: boolean;
+  minPrice?: number;
+  maxPrice?: number;
+  availableSizes: number[];
+  inStock: boolean;
+  primaryImageUrl?: string;
+  publishedAtUtc?: string;
+  sortRank: number;
+}
+
+export interface SearchResponseDto {
+  products: SearchProductItemDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  facets: SearchFacetsDto;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
+export interface ProductAutocompleteItemDto {
+  productId: number;
+  slug: string;
+  name: string;
+  brandName: string;
+  primaryImageUrl?: string;
+}
+
+export interface ProductAutocompleteResultDto {
+  items: ProductAutocompleteItemDto[];
 }
 
 // Home Page
@@ -184,6 +286,7 @@ export interface EditorialArticleCardDto {
 
 export interface EditorialArticleDto extends EditorialArticleCardDto {
   body: string;
+  seo?: SeoDto;
   relatedArticles?: EditorialArticleCardDto[];
   relatedProducts?: ProductCardDto[];
 }
@@ -195,11 +298,21 @@ export interface StoreCardDto {
   name: string;
   city: string;
   address: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  postalCode?: string;
   phone?: string;
   email?: string;
   hoursOpen?: string;
   hoursClose?: string;
+  workingHoursText?: string;
   coverImageUrl?: string;
+  imageUrl?: string;
+  operatingHours?: string;
+  description?: string;
+  shortDescription?: string;
+  amenities?: string[];
+  seo?: SeoDto;
 }
 
 export interface StorePageDto extends StoreCardDto {
@@ -219,6 +332,7 @@ export interface StorePageDto extends StoreCardDto {
 
 // Cart
 export interface CartItemDto {
+  id?: number;
   itemId: number;
   productVariantId: number;
   productSlug: string;
@@ -226,9 +340,12 @@ export interface CartItemDto {
   brandName: string;
   sizeEu: number;
   primaryImageUrl?: string;
+  productImageUrl?: string;
+  selectedSize?: number | string;
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  totalPrice?: number;
   isAvailable: boolean;
   isLowStock: boolean;
 }
@@ -270,10 +387,12 @@ export interface CheckoutSummaryDto {
 }
 
 export interface CheckoutRequest {
+  idempotencyKey?: string;
   cartToken: string;
   customerFirstName: string;
   customerLastName: string;
   email: string;
+  customerEmail?: string;
   phone: string;
   deliveryAddressLine1: string;
   deliveryAddressLine2?: string;
@@ -285,10 +404,17 @@ export interface CheckoutRequest {
 }
 
 export interface CheckoutResultDto {
+  outcome: 'Success' | 'AlreadyProcessed' | 'InvalidCart' | 'InsufficientStock';
+  message: string;
   orderNumber: string;
   totalAmount: number;
   status: string;
+  isSuccess?: boolean;
+  alreadyProcessed?: boolean;
 }
+
+export type DeliveryMethod = 'Courier' | 'StorePickup';
+export type PaymentMethod = 'CashOnDelivery' | 'CardPlaceholder';
 
 // Order
 export interface OrderItemDto {

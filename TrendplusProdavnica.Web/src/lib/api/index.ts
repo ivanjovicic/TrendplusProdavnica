@@ -1,5 +1,15 @@
 import { apiClient } from './api-client';
-import type { HomePageDto, ProductListingPageDto, ProductdetailDto, BrandPageDto, CollectionPageDto, EditorialArticleDto, StorePageDto } from '@/lib/types';
+import type {
+  HomePageDto,
+  ProductListingPageDto,
+  ProductdetailDto,
+  BrandPageDto,
+  CollectionPageDto,
+  EditorialArticleDto,
+  ProductAutocompleteResultDto,
+  SearchResponseDto,
+  StorePageDto,
+} from '@/lib/types';
 
 // Pages
 export async function getHomePage() {
@@ -8,6 +18,7 @@ export async function getHomePage() {
 
 // Listings
 interface ListingParams {
+  [key: string]: string | number | boolean | undefined;
   page?: number;
   pageSize?: number;
   sort?: string;
@@ -41,9 +52,40 @@ export async function getSaleCategoryListing(categorySlug: string, params?: List
   return apiClient.get<ProductListingPageDto>(`/listings/sale/${categorySlug}`, { searchParams: params });
 }
 
+interface SearchParams {
+  [key: string]: string | number | boolean | string[] | number[] | undefined;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  brands?: string[];
+  colors?: string[];
+  sizes?: number[];
+  minPrice?: number;
+  maxPrice?: number;
+  availability?: string[];
+  isOnSale?: boolean;
+  isNew?: boolean;
+  sort?: string;
+}
+
+export async function searchProducts(params?: SearchParams) {
+  return apiClient.get<SearchResponseDto>('/search', { searchParams: params });
+}
+
+export async function autocompleteProducts(
+  q: string,
+  limit = 6,
+  options?: RequestInit,
+) {
+  return apiClient.get<ProductAutocompleteResultDto>('/search/autocomplete', {
+    ...options,
+    searchParams: { q, limit },
+  });
+}
+
 // Products
 export async function getProductDetail(slug: string) {
-  return apiClient.get<ProductdetailDto>(`/products/${slug}`);
+  return apiClient.get<ProductdetailDto>(`/catalog/product/${slug}`);
 }
 
 // Brands
@@ -67,6 +109,7 @@ export async function getEditorialArticle(slug: string) {
 
 // Stores
 interface StoresParams {
+  [key: string]: string | number | boolean | undefined;
   city?: string;
   page?: number;
   pageSize?: number;

@@ -1,0 +1,12 @@
+User-Agent: *
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /search
+Disallow: /account
+Disallow: /wishlist
+Disallow: /korpa
+Disallow: /omiljeno
+
+Host: http://localhost:3000
+Sitemap: http://localhost:3000/sitemap.xml

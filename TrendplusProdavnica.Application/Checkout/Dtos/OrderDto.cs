@@ -6,6 +6,7 @@ public class OrderDto
     public string Status { get; set; } = null!;
     public string CustomerFullName { get; set; } = null!;
     public string Email { get; set; } = null!;
+    public string CustomerEmail => Email;
     public string Phone { get; set; } = null!;
     
     public string DeliveryAddressLine1 { get; set; } = null!;
@@ -19,6 +20,7 @@ public class OrderDto
     public decimal SubtotalAmount { get; set; }
     public decimal DeliveryAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal TotalPrice => TotalAmount;
     
     public List<OrderItemDto> Items { get; set; } = new();
     public DateTimeOffset CreatedAt { get; set; }

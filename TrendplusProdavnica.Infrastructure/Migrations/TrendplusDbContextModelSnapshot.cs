@@ -22,6 +22,81 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Analytics.AnalyticsEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventData")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("EventTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short>("EventType")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("PageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<long?>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ReferrerUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventTimestamp")
+                        .HasDatabaseName("IX_analytics_events_timestamp");
+
+                    b.HasIndex("EventType")
+                        .HasDatabaseName("IX_analytics_events_eventtype");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("IX_analytics_events_productid");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("IX_analytics_events_sessionid");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_analytics_events_userid");
+
+                    b.HasIndex("EventType", "EventTimestamp")
+                        .HasDatabaseName("IX_analytics_events_type_timestamp");
+
+                    b.HasIndex("ProductId", "EventType")
+                        .HasDatabaseName("IX_analytics_events_product_eventtype");
+
+                    b.ToTable("analytics_events", "analytics");
+                });
+
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.Brand", b =>
                 {
                     b.Property<long>("Id")
@@ -641,6 +716,76 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.ToTable("product_media", "catalog");
                 });
 
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductRating", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AverageRating")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(3, 2)
+                        .HasColumnType("numeric(3,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FiveStarCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("FourStarCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTimeOffset?>("LastReviewAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OneStarCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("RatingCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("ReviewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("ThreeStarCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("TwoStarCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_product_ratings_product_id");
+
+                    b.ToTable("product_ratings", "catalog");
+                });
+
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductRelatedProduct", b =>
                 {
                     b.Property<long>("ProductId")
@@ -671,6 +816,67 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.HasIndex("RelatedProductId");
 
                     b.ToTable("product_related_products", "catalog");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductReview", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("IsVerifiedPurchase")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("RatingValue")
+                        .HasPrecision(2, 1)
+                        .HasColumnType("numeric(2,1)");
+
+                    b.Property<string>("ReviewBody")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_product_reviews_external_key");
+
+                    b.HasIndex("ProductId", "Status", "PublishedAtUtc")
+                        .HasDatabaseName("ix_product_reviews_product_status_published_at");
+
+                    b.ToTable("product_reviews", "catalog");
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductVariant", b =>
@@ -761,7 +967,8 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.HasIndex("Price")
                         .HasDatabaseName("ix_product_variants_price");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_product_variant_product_id");
 
                     b.HasIndex("Sku")
                         .IsUnique()
@@ -972,6 +1179,66 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("category_page_contents", "content");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Content.CategorySeoContent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CategoryId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Faq")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("IntroText")
+                        .HasColumnType("text");
+
+                    b.Property<string>("IntroTitle")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("IsPublished")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("MainContent")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MetaDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MetaTitle")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_category_seo_content_categoryid");
+
+                    b.HasIndex("IsPublished", "PublishedAtUtc")
+                        .HasDatabaseName("IX_category_seo_content_ispublished_publisheda");
+
+                    b.ToTable("category_seo_content", "content");
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Content.CollectionPageContent", b =>
@@ -1512,6 +1779,143 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.ToTable("TrustPages");
                 });
 
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Experiments.Experiment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("EndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ExperimentType")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinimumDurationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("StatisticalSignificance")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<int>("TrafficSplit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(50);
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VariantA")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("VariantB")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<char?>("WinnerVariant")
+                        .HasColumnType("character(1)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExperimentType")
+                        .HasDatabaseName("IX_experiments_experimenttype");
+
+                    b.HasIndex("StartedAtUtc")
+                        .HasDatabaseName("IX_experiments_startedat");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_experiments_status");
+
+                    b.HasIndex("Status", "StartedAtUtc")
+                        .HasDatabaseName("IX_experiments_status_startedat");
+
+                    b.ToTable("experiments", "experiments");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Experiments.ExperimentAssignment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("AssignedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<char>("AssignedVariant")
+                        .HasColumnType("character(1)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ExperimentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedAtUtc")
+                        .HasDatabaseName("IX_experiment_assignments_assignedat");
+
+                    b.HasIndex("AssignedVariant")
+                        .HasDatabaseName("IX_experiment_assignments_assignedvariant");
+
+                    b.HasIndex("ExperimentId", "AssignedAtUtc")
+                        .HasDatabaseName("IX_experiment_assignments_experimentid_assignedat");
+
+                    b.HasIndex("ExperimentId", "SessionId")
+                        .HasDatabaseName("IX_experiment_assignments_experimentid_sessionid");
+
+                    b.HasIndex("ExperimentId", "UserId")
+                        .HasDatabaseName("IX_experiment_assignments_experimentid_userid");
+
+                    b.ToTable("experiment_assignments", "experiments");
+                });
+
             modelBuilder.Entity("TrendplusProdavnica.Domain.Inventory.Store", b =>
                 {
                     b.Property<long>("Id")
@@ -1640,6 +2044,128 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.HasIndex("VariantId");
 
                     b.ToTable("store_inventory", "inventory");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Merchandising.MerchandisingRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("BoostScore")
+                        .HasColumnType("numeric");
+
+                    b.Property<long?>("BrandId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CategoryId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("EndDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<short>("RuleType")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTimeOffset>("StartDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("UpdatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MerchandisingRules");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Personalization.UserProfile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FavoriteBrandIds")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("LastPersonalizationAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PreferredCategoryIds")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("PreferredPriceMax")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("PreferredPriceMin")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("RecentlyViewed")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastPersonalizationAtUtc")
+                        .HasDatabaseName("IX_user_profiles_lastpersonalizationat");
+
+                    b.HasIndex("LastUpdatedAtUtc")
+                        .HasDatabaseName("IX_user_profiles_lastupdatedat");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_user_profiles_userid");
+
+                    b.ToTable("user_profiles", "personalization");
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Pricing.Promotion", b =>
@@ -1837,11 +2363,19 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<short>("Status")
                         .HasColumnType("smallint");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -1858,8 +2392,14 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.HasIndex("ExpiresAtUtc")
                         .HasDatabaseName("ix_carts_expires_at_utc");
 
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_carts_session_id");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_carts_status");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_carts_user_id");
 
                     b.ToTable("carts", "sales");
                 });
@@ -1923,6 +2463,10 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
 
                     b.Property<long?>("CartId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("CheckoutIdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
@@ -2012,6 +2556,16 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CartId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_orders_cart_id")
+                        .HasFilter("\"cart_id\" IS NOT NULL");
+
+                    b.HasIndex("CheckoutIdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_orders_checkout_idempotency_key")
+                        .HasFilter("\"checkout_idempotency_key\" IS NOT NULL");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique()
@@ -2120,6 +2674,84 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("wishlist_items", "sales");
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Search.SearchIndexEventLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeadLetterReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("DeadLetteredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<bool>("IsDeadLettered")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsProcessed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("LastRetryAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_search_index_events_product_id");
+
+                    b.HasIndex("IsDeadLettered", "DeadLetteredAtUtc")
+                        .HasDatabaseName("ix_search_index_events_dlq");
+
+                    b.HasIndex("IsProcessed", "CreatedAtUtc")
+                        .HasDatabaseName("ix_search_index_events_pending");
+
+                    b.ToTable("search_index_events", (string)null);
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Shared.SlugRedirect", b =>
@@ -2390,6 +3022,17 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductRating", b =>
+                {
+                    b.HasOne("TrendplusProdavnica.Domain.Catalog.Product", "Product")
+                        .WithOne("Rating")
+                        .HasForeignKey("TrendplusProdavnica.Domain.Catalog.ProductRating", "ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductRelatedProduct", b =>
                 {
                     b.HasOne("TrendplusProdavnica.Domain.Catalog.Product", null)
@@ -2403,6 +3046,17 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                         .HasForeignKey("RelatedProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductReview", b =>
+                {
+                    b.HasOne("TrendplusProdavnica.Domain.Catalog.Product", "Product")
+                        .WithMany("Reviews")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("TrendplusProdavnica.Domain.Catalog.ProductVariant", b =>
@@ -2814,6 +3468,16 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
                     b.Navigation("Seo");
                 });
 
+            modelBuilder.Entity("TrendplusProdavnica.Domain.Experiments.ExperimentAssignment", b =>
+                {
+                    b.HasOne("TrendplusProdavnica.Domain.Experiments.Experiment", null)
+                        .WithMany()
+                        .HasForeignKey("ExperimentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_experiment_assignments_experimentid");
+                });
+
             modelBuilder.Entity("TrendplusProdavnica.Domain.Inventory.Store", b =>
                 {
                     b.OwnsOne("TrendplusProdavnica.Domain.ValueObjects.SeoMetadata", "Seo", b1 =>
@@ -2969,7 +3633,11 @@ namespace TrendplusProdavnica.Infrastructure.Migrations
 
                     b.Navigation("Media");
 
+                    b.Navigation("Rating");
+
                     b.Navigation("RelatedProducts");
+
+                    b.Navigation("Reviews");
 
                     b.Navigation("Variants");
                 });

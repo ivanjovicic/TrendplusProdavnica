@@ -1,4 +1,5 @@
 #nullable enable
+using System.ComponentModel.DataAnnotations.Schema;
 using TrendplusProdavnica.Domain.Common;
 using TrendplusProdavnica.Domain.Catalog;
 
@@ -29,6 +30,13 @@ namespace TrendplusProdavnica.Domain.Sales
         /// Unit price of the variant at time of addition to cart
         /// </summary>
         public decimal UnitPrice { get; set; }
+
+        [NotMapped]
+        public decimal Price
+        {
+            get => UnitPrice;
+            set => UnitPrice = value;
+        }
 
         /// <summary>
         /// Navigation: ProductVariant

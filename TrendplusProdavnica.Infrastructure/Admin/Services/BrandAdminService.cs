@@ -8,12 +8,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TrendplusProdavnica.Application.Admin.Common;
 using TrendplusProdavnica.Application.Admin.Dtos;
-using TrendplusProdavnica.Application.Admin.Services;
 using TrendplusProdavnica.Application.Common.Caching;
 using TrendplusProdavnica.Application.Search.Services;
 using TrendplusProdavnica.Domain.Catalog;
 using TrendplusProdavnica.Infrastructure.Admin.Common;
 using TrendplusProdavnica.Infrastructure.Persistence;
+using IBrandAdminService = TrendplusProdavnica.Application.Admin.Services.IBrandAdminService;
 
 namespace TrendplusProdavnica.Infrastructure.Admin.Services
 {
@@ -38,12 +38,26 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
 
         public async Task<IReadOnlyList<BrandAdminDto>> GetListAsync(CancellationToken cancellationToken = default)
         {
-            var entities = await _db.Brands.AsNoTracking()
+            return await _db.Brands.AsNoTracking()
                 .OrderBy(entity => entity.SortOrder)
                 .ThenBy(entity => entity.Name)
+                .Select(entity => new BrandAdminDto(
+                    entity.Id,
+                    entity.Name,
+                    entity.Slug,
+                    entity.ShortDescription,
+                    entity.LongDescription,
+                    entity.LogoUrl,
+                    entity.CoverImageUrl,
+                    entity.WebsiteUrl,
+                    entity.IsFeatured,
+                    entity.IsActive,
+                    entity.SortOrder,
+                    _db.Products.Count(product => product.BrandId == entity.Id),
+                    AdminMappingHelper.ToSeoDto(entity.Seo),
+                    entity.CreatedAtUtc,
+                    entity.UpdatedAtUtc))
                 .ToArrayAsync(cancellationToken);
-
-            return entities.Select(Map).ToArray();
         }
 
         public async Task<BrandAdminDto> GetByIdAsync(long id, CancellationToken cancellationToken = default)
@@ -56,7 +70,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 throw new AdminNotFoundException($"Brand with id '{id}' was not found.");
             }
 
-            return Map(entity);
+            var productCount = await _db.Products.AsNoTracking()
+                .CountAsync(product => product.BrandId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         public async Task<BrandAdminDto> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
@@ -70,10 +87,13 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 throw new AdminNotFoundException($"Brand with slug '{slug}' was not found.");
             }
 
-            return Map(entity);
+            var productCount = await _db.Products.AsNoTracking()
+                .CountAsync(product => product.BrandId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
-        public async Task<BrandAdminDto> CreateAsync(CreateBrandRequest request, CancellationToken cancellationToken = default)
+        public async Task<BrandAdminDto> CreateAsync(TrendplusProdavnica.Application.Admin.Dtos.CreateBrandRequest request, CancellationToken cancellationToken = default)
         {
             await ValidateAsync(request.Name, request.Slug, request.LogoUrl, request.CoverImageUrl, request.WebsiteUrl, request.Seo, null, cancellationToken);
 
@@ -99,10 +119,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             await _db.SaveChangesAsync(cancellationToken);
             await _cacheInvalidationService.InvalidateBrandBySlugAsync(entity.Slug, cancellationToken);
 
-            return Map(entity);
+            return Map(entity, 0);
         }
 
-        public async Task<BrandAdminDto> UpdateAsync(long id, UpdateBrandRequest request, CancellationToken cancellationToken = default)
+        public async Task<BrandAdminDto> UpdateAsync(long id, TrendplusProdavnica.Application.Admin.Dtos.UpdateBrandRequest request, CancellationToken cancellationToken = default)
         {
             var entity = await _db.Brands
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
@@ -135,7 +155,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             }
             await _cacheInvalidationService.InvalidateBrandBySlugAsync(entity.Slug, cancellationToken);
             await TryReindexAllAsync(cancellationToken);
-            return Map(entity);
+            var productCount = await _db.Products.AsNoTracking()
+                .CountAsync(product => product.BrandId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         public async Task<BrandAdminDto> DeactivateAsync(long id, CancellationToken cancellationToken = default)
@@ -154,7 +177,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             await _cacheInvalidationService.InvalidateBrandBySlugAsync(entity.Slug, cancellationToken);
             await TryReindexAllAsync(cancellationToken);
 
-            return Map(entity);
+            var productCount = await _db.Products.AsNoTracking()
+                .CountAsync(product => product.BrandId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         private async Task TryReindexAllAsync(CancellationToken cancellationToken)
@@ -227,7 +253,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             }
         }
 
-        private static BrandAdminDto Map(Brand entity)
+        private static BrandAdminDto Map(Brand entity, int productCount)
         {
             return new BrandAdminDto(
                 entity.Id,
@@ -241,6 +267,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 entity.IsFeatured,
                 entity.IsActive,
                 entity.SortOrder,
+                productCount,
                 AdminMappingHelper.ToSeoDto(entity.Seo),
                 entity.CreatedAtUtc,
                 entity.UpdatedAtUtc);

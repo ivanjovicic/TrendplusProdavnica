@@ -1,27 +1,32 @@
 namespace TrendplusProdavnica.Domain.Sales;
 
 /// <summary>
-/// Estados posibles de una orden
+/// Possible lifecycle statuses for an order.
 /// </summary>
 public enum OrderStatus : short
 {
     /// <summary>
-    /// Orden en borrador, no confirmada
+    /// Order created and awaiting payment.
     /// </summary>
-    Draft = 0,
+    Pending = 1,
 
     /// <summary>
-    /// Orden creada, esperando pago
+    /// Payment captured.
     /// </summary>
-    PendingPayment = 1,
+    Paid = 2,
 
     /// <summary>
-    /// Orden confirmada y pagada
+    /// Order left warehouse and is in delivery.
     /// </summary>
-    Placed = 2,
+    Shipped = 4,
 
     /// <summary>
-    /// Orden cancelada
+    /// Order delivered and completed.
+    /// </summary>
+    Completed = 5,
+
+    /// <summary>
+    /// Order cancelled.
     /// </summary>
     Cancelled = 3,
 }

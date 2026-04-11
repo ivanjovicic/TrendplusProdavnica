@@ -1,0 +1,53 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: production
+    environment: {{ ENVIRONMENT }}
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "./rules/alerts.yml"
+
+scrape_configs:
+  # TrendplusProdavnica API
+  - job_name: 'trendplus-api'
+    static_configs:
+      - targets: ['localhost:5000']
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: [__scheme__]
+        target_label: scheme
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # PostgreSQL (if using prometheus-postgres-exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['localhost:9187']
+    metrics_path: '/metrics'
+
+  # Node Exporter (if running on Linux)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  # Jaeger/Tempo (if using distributed tracing)
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['localhost:6831']
+    scrape_interval: 30s

@@ -76,9 +76,9 @@ TrendplusProdavnica.Application
 
 ### 2. Product Listing Page (PLP)
 **Screens:** 
-- `GET /kategorija/{slug}?...` (Category listing)
-- `GET /brend/{slug}?...` (Brand listing)
-- `GET /kolekcija/{slug}?...` (Collection listing)
+- `GET /{categorySlug}?...` (Category listing)
+- `GET /brendovi/{slug}?...` (Brand listing)
+- `GET /kolekcije/{slug}?...` (Collection listing)
 - `GET /sale?...` (Sale listing)
 
 **DTO:** `ProductListingPageDto`
@@ -148,7 +148,7 @@ inStockOnly=true
 ```
 
 ### 4. Brand Page
-**Screen:** `GET /brend/{slug}`  
+**Screen:** `GET /brendovi/{slug}`  
 **DTO:** `BrandPageDto`
 
 **Response shape:**
@@ -165,7 +165,7 @@ inStockOnly=true
 ```
 
 ### 5. Collection Page
-**Screen:** `GET /kolekcija/{slug}`  
+**Screen:** `GET /kolekcije/{slug}`  
 **DTO:** `CollectionPageDto`
 
 **Response shape:**

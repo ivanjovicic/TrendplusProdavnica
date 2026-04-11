@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TrendplusProdavnica.Application.Admin.Common;
 using TrendplusProdavnica.Application.Admin.Dtos;
-using TrendplusProdavnica.Application.Admin.Services;
 using TrendplusProdavnica.Application.Common.Caching;
 using TrendplusProdavnica.Domain.Catalog;
 using TrendplusProdavnica.Domain.Enums;
 using TrendplusProdavnica.Infrastructure.Admin.Common;
 using TrendplusProdavnica.Infrastructure.Persistence;
+using ICollectionAdminService = TrendplusProdavnica.Application.Admin.Services.ICollectionAdminService;
 
 namespace TrendplusProdavnica.Infrastructure.Admin.Services
 {
@@ -31,12 +31,29 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
 
         public async Task<IReadOnlyList<CollectionAdminDto>> GetListAsync(CancellationToken cancellationToken = default)
         {
-            var entities = await _db.Collections.AsNoTracking()
+            return await _db.Collections.AsNoTracking()
                 .OrderBy(entity => entity.SortOrder)
                 .ThenBy(entity => entity.Name)
+                .Select(entity => new CollectionAdminDto(
+                    entity.Id,
+                    entity.Name,
+                    entity.Slug,
+                    entity.CollectionType,
+                    entity.ShortDescription,
+                    entity.LongDescription,
+                    entity.CoverImageUrl,
+                    entity.ThumbnailImageUrl,
+                    entity.BadgeText,
+                    entity.StartAtUtc,
+                    entity.EndAtUtc,
+                    entity.IsFeatured,
+                    entity.IsActive,
+                    entity.SortOrder,
+                    _db.ProductCollectionMaps.Count(map => map.CollectionId == entity.Id),
+                    AdminMappingHelper.ToSeoDto(entity.Seo),
+                    entity.CreatedAtUtc,
+                    entity.UpdatedAtUtc))
                 .ToArrayAsync(cancellationToken);
-
-            return entities.Select(Map).ToArray();
         }
 
         public async Task<CollectionAdminDto> GetByIdAsync(long id, CancellationToken cancellationToken = default)
@@ -49,7 +66,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 throw new AdminNotFoundException($"Collection with id '{id}' was not found.");
             }
 
-            return Map(entity);
+            var productCount = await _db.ProductCollectionMaps.AsNoTracking()
+                .CountAsync(map => map.CollectionId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         public async Task<CollectionAdminDto> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
@@ -63,10 +83,13 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 throw new AdminNotFoundException($"Collection with slug '{slug}' was not found.");
             }
 
-            return Map(entity);
+            var productCount = await _db.ProductCollectionMaps.AsNoTracking()
+                .CountAsync(map => map.CollectionId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
-        public async Task<CollectionAdminDto> CreateAsync(CreateCollectionRequest request, CancellationToken cancellationToken = default)
+        public async Task<CollectionAdminDto> CreateAsync(TrendplusProdavnica.Application.Admin.Dtos.CreateCollectionRequest request, CancellationToken cancellationToken = default)
         {
             await ValidateAsync(
                 request.Name,
@@ -105,10 +128,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             await _db.SaveChangesAsync(cancellationToken);
             await _cacheInvalidationService.InvalidateCollectionBySlugAsync(entity.Slug, cancellationToken);
 
-            return Map(entity);
+            return Map(entity, 0);
         }
 
-        public async Task<CollectionAdminDto> UpdateAsync(long id, UpdateCollectionRequest request, CancellationToken cancellationToken = default)
+        public async Task<CollectionAdminDto> UpdateAsync(long id, TrendplusProdavnica.Application.Admin.Dtos.UpdateCollectionRequest request, CancellationToken cancellationToken = default)
         {
             var entity = await _db.Collections
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
@@ -153,7 +176,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 await _cacheInvalidationService.InvalidateCollectionBySlugAsync(previousSlug, cancellationToken);
             }
             await _cacheInvalidationService.InvalidateCollectionBySlugAsync(entity.Slug, cancellationToken);
-            return Map(entity);
+            var productCount = await _db.ProductCollectionMaps.AsNoTracking()
+                .CountAsync(map => map.CollectionId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         public async Task<CollectionAdminDto> ArchiveAsync(long id, CancellationToken cancellationToken = default)
@@ -170,7 +196,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
             await _cacheInvalidationService.InvalidateCollectionBySlugAsync(entity.Slug, cancellationToken);
-            return Map(entity);
+            var productCount = await _db.ProductCollectionMaps.AsNoTracking()
+                .CountAsync(map => map.CollectionId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         public async Task<CollectionAdminDto> UnarchiveAsync(long id, CancellationToken cancellationToken = default)
@@ -187,7 +216,10 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             entity.UpdatedAtUtc = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
             await _cacheInvalidationService.InvalidateCollectionBySlugAsync(entity.Slug, cancellationToken);
-            return Map(entity);
+            var productCount = await _db.ProductCollectionMaps.AsNoTracking()
+                .CountAsync(map => map.CollectionId == entity.Id, cancellationToken);
+
+            return Map(entity, productCount);
         }
 
         private async Task ValidateAsync(
@@ -255,7 +287,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
             }
         }
 
-        private static CollectionAdminDto Map(Collection entity)
+        private static CollectionAdminDto Map(Collection entity, int productCount)
         {
             return new CollectionAdminDto(
                 entity.Id,
@@ -272,6 +304,7 @@ namespace TrendplusProdavnica.Infrastructure.Admin.Services
                 entity.IsFeatured,
                 entity.IsActive,
                 entity.SortOrder,
+                productCount,
                 AdminMappingHelper.ToSeoDto(entity.Seo),
                 entity.CreatedAtUtc,
                 entity.UpdatedAtUtc);

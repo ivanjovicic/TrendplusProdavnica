@@ -43,6 +43,7 @@ namespace TrendplusProdavnica.Infrastructure.Caching
     {
         public bool Enabled { get; set; } = true;
         public TimeSpan HomePageDuration { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan ListingPageDuration { get; set; } = TimeSpan.FromMinutes(2);
         public TimeSpan EntityPageDuration { get; set; } = TimeSpan.FromSeconds(30);
         public TimeSpan ProductDetailDuration { get; set; } = TimeSpan.FromMinutes(5);
     }

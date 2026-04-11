@@ -1,23 +1,55 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
+import { StorefrontMobileMenu } from './storefront-mobile-menu';
+import { HeaderSearchAutocomplete } from './header-search-autocomplete';
 
 export function Header() {
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <Link href="/" className="text-2xl font-bold">
-            Trendplus
+    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="text-lg font-light tracking-widest text-gray-900">
+          TRENDPLUS
+        </Link>
+
+        <nav className="hidden items-center gap-8 sm:flex">
+          <Link href="/" className="text-sm text-gray-600 transition-colors hover:text-gray-900">
+            Pocetna
           </Link>
-          <nav className="flex gap-8">
-            <Link href="/" className="hover:underline">Početna</Link>
-            <Link href="/brendovi/tamaris" className="hover:underline">Brendovi</Link>
-            <Link href="/akcija" className="hover:underline">Akcija</Link>
-            <Link href="/prodavnice" className="hover:underline">Prodavnice</Link>
-          </nav>
-          <Link href="/korpa" className="hover:underline">🛒 Korpa</Link>
+          <Link href="/brendovi/tamaris" className="text-sm text-gray-600 transition-colors hover:text-gray-900">
+            Brendovi
+          </Link>
+          <Link href="/akcija" className="text-sm text-gray-600 transition-colors hover:text-gray-900">
+            Akcija
+          </Link>
+          <Link href="/prodavnice" className="text-sm text-gray-600 transition-colors hover:text-gray-900">
+            Prodavnice
+          </Link>
+        </nav>
+
+        <div className="relative flex items-center gap-4">
+          <HeaderSearchAutocomplete />
+          <Link
+            href="/search"
+            className="text-sm text-gray-600 transition-colors hover:text-gray-900 lg:hidden"
+            title="Pretraga"
+          >
+            Pretraga
+          </Link>
+          <Link
+            href="/omiljeno"
+            className="text-sm text-gray-600 transition-colors hover:text-gray-900"
+            title="Omiljeno"
+          >
+            Lista zelja
+          </Link>
+          <Link
+            href="/korpa"
+            className="text-sm text-gray-600 transition-colors hover:text-gray-900"
+            title="Korpa"
+          >
+            Korpa
+          </Link>
+          <StorefrontMobileMenu />
         </div>
       </div>
     </header>
@@ -26,30 +58,101 @@ export function Header() {
 
 export function Footer() {
   return (
-    <footer className="bg-gray-900 text-white py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <footer className="mt-16 border-t border-gray-200 bg-white md:mt-24">
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 md:py-20">
+        <div className="mb-12 grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4">
           <div>
-            <h3 className="font-bold text-lg mb-4">O nama</h3>
-            <p className="text-gray-400">Top brend obuće od 1987</p>
+            <h2 className="mb-4 text-sm font-light tracking-widest text-gray-900">TRENDPLUS</h2>
+            <p className="text-sm leading-relaxed text-gray-600">
+              Premium obuca od vodecih svetskih brendova od 1987.
+            </p>
           </div>
+
           <div>
-            <h3 className="font-bold text-lg mb-4">Linkovi</h3>
-            <ul className="space-y-2 text-gray-400">
-              <li><Link href="#" className="hover:text-white">Kontakt</Link></li>
-              <li><Link href="#" className="hover:text-white">Dostava</Link></li>
-              <li><Link href="#" className="hover:text-white">Vraćanja</Link></li>
+            <h3 className="mb-4 text-xs font-medium uppercase tracking-widest text-gray-900">Kupi</h3>
+            <ul className="space-y-3 text-sm text-gray-600">
+              <li>
+                <Link href="/" className="transition-colors hover:text-gray-900">
+                  Pocetna
+                </Link>
+              </li>
+              <li>
+                <Link href="/brendovi/tamaris" className="transition-colors hover:text-gray-900">
+                  Brendovi
+                </Link>
+              </li>
+              <li>
+                <Link href="/akcija" className="transition-colors hover:text-gray-900">
+                  Akcija
+                </Link>
+              </li>
+              <li>
+                <Link href="/kolekcije/novo" className="transition-colors hover:text-gray-900">
+                  Kolekcije
+                </Link>
+              </li>
             </ul>
           </div>
+
           <div>
-            <h3 className="font-bold text-lg mb-4">Prodavnice</h3>
-            <ul className="space-y-2 text-gray-400">
-              <li><Link href="/prodavnice/beograd" className="hover:text-white">Beograd</Link></li>
+            <h3 className="mb-4 text-xs font-medium uppercase tracking-widest text-gray-900">Pomoc</h3>
+            <ul className="space-y-3 text-sm text-gray-600">
+              <li>
+                <Link href="#" className="transition-colors hover:text-gray-900">
+                  Kontakt
+                </Link>
+              </li>
+              <li>
+                <Link href="#" className="transition-colors hover:text-gray-900">
+                  Dostava
+                </Link>
+              </li>
+              <li>
+                <Link href="#" className="transition-colors hover:text-gray-900">
+                  Vracanja
+                </Link>
+              </li>
+              <li>
+                <Link href="/prodavnice" className="transition-colors hover:text-gray-900">
+                  Prodavnice
+                </Link>
+              </li>
             </ul>
           </div>
+
           <div>
-            <h3 className="font-bold text-lg mb-4">Vezanost</h3>
-            <p className="text-gray-400">© 2026 Trendplus. Sva prava zadržana.</p>
+            <h3 className="mb-4 text-xs font-medium uppercase tracking-widest text-gray-900">Novine</h3>
+            <p className="mb-4 text-sm text-gray-600">Prati nove proizvode i kolekcije.</p>
+            <form className="space-y-3">
+              <input
+                type="email"
+                placeholder="Tvoja email adresa"
+                className="w-full border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-gray-900 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="w-full bg-gray-900 py-2 text-sm text-white transition-colors hover:bg-gray-800"
+              >
+                Prijavi se
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-8">
+          <div className="flex flex-col items-center justify-between text-sm text-gray-600 md:flex-row">
+            <p>&copy; 2026 Trendplus. Sva prava zadrzana.</p>
+            <div className="mt-4 flex gap-6 md:mt-0">
+              <Link href="#" className="transition-colors hover:text-gray-900">
+                Privatnost
+              </Link>
+              <Link href="#" className="transition-colors hover:text-gray-900">
+                Uslovi
+              </Link>
+              <Link href="#" className="transition-colors hover:text-gray-900">
+                Kolacici
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -58,5 +161,5 @@ export function Footer() {
 }
 
 export function Container({ children }: { children: React.ReactNode }) {
-  return <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">{children}</div>;
+  return <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{children}</div>;
 }

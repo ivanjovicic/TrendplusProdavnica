@@ -1,10 +1,15 @@
 #nullable enable
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrendplusProdavnica.Api.Infrastructure.Auth;
 using TrendplusProdavnica.Application.Admin.Dtos;
 using TrendplusProdavnica.Application.Admin.Services;
+using TrendplusProdavnica.Domain.Enums;
 
 namespace TrendplusProdavnica.Api.Controllers.Admin
 {
+    [Authorize(Policy = ApiAuthorizationPolicies.Admin)]
     [ApiController]
     [Route("api/admin/editorial")]
     public class EditorialAdminController : ControllerBase
@@ -17,9 +22,30 @@ namespace TrendplusProdavnica.Api.Controllers.Admin
         }
 
         [HttpGet]
-        public async Task<ActionResult<IReadOnlyList<EditorialArticleAdminDto>>> GetList(CancellationToken cancellationToken)
+        public async Task<ActionResult<AdminListResponse<EditorialArticleAdminDto>>> GetList(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] bool? published = null,
+            CancellationToken cancellationToken = default)
         {
-            return Ok(await _service.GetListAsync(cancellationToken));
+            var items = await _service.GetListAsync(cancellationToken);
+
+            if (published.HasValue)
+            {
+                items = items
+                    .Where(item => (item.Status == ContentStatus.Published) == published.Value)
+                    .ToArray();
+            }
+
+            var pagedItems = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(new AdminListResponse<EditorialArticleAdminDto>
+            {
+                Items = pagedItems,
+                TotalCount = items.Count,
+                Page = page,
+                PageSize = pageSize
+            });
         }
 
         [HttpGet("{id:long}")]
@@ -55,6 +81,12 @@ namespace TrendplusProdavnica.Api.Controllers.Admin
 
         [HttpPost("{id:long}/archive")]
         public async Task<ActionResult<EditorialArticleAdminDto>> Archive(long id, CancellationToken cancellationToken)
+        {
+            return Ok(await _service.ArchiveAsync(id, cancellationToken));
+        }
+
+        [HttpDelete("{id:long}")]
+        public async Task<ActionResult<EditorialArticleAdminDto>> Delete(long id, CancellationToken cancellationToken)
         {
             return Ok(await _service.ArchiveAsync(id, cancellationToken));
         }

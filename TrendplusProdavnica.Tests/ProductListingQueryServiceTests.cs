@@ -3,10 +3,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using TrendplusProdavnica.Application.Merchandising.Services;
 using TrendplusProdavnica.Application.Catalog.Queries;
 using TrendplusProdavnica.Application.Catalog.Services;
 using TrendplusProdavnica.Domain.Catalog;
 using TrendplusProdavnica.Domain.Enums;
+using TrendplusProdavnica.Domain.Merchandising;
 using TrendplusProdavnica.Infrastructure.DependencyInjection;
 using TrendplusProdavnica.Infrastructure.Persistence;
 using Xunit;
@@ -19,8 +21,10 @@ namespace TrendplusProdavnica.Tests
         public async Task GetCategoryListingAsync_Returns_Published_ProductCard()
         {
             var services = new ServiceCollection();
+            services.AddLogging();
             services.AddDbContext<TrendplusDbContext>(options => options.UseInMemoryDatabase("ProductListingCategoryTest"));
             services.AddInfrastructureQueries();
+            services.AddSingleton<IMerchandisingService, NoOpMerchandisingService>();
 
             using var provider = services.BuildServiceProvider();
             using var scope = provider.CreateScope();
@@ -112,6 +116,30 @@ namespace TrendplusProdavnica.Tests
             Assert.Equal(5990m, result.Products[0].Price);
             Assert.True(result.Products[0].IsInStock);
             Assert.Equal(1, result.Products[0].AvailableSizesCount);
+        }
+
+        private sealed class NoOpMerchandisingService : IMerchandisingService
+        {
+            public Task<IReadOnlyList<MerchandisingRule>> GetActiveRulesAsync(int? categoryId = null, int? brandId = null, bool useCache = true)
+                => Task.FromResult<IReadOnlyList<MerchandisingRule>>(Array.Empty<MerchandisingRule>());
+
+            public Task<IReadOnlyList<MerchandisingRule>> GetAllRulesAsync(bool useCache = true)
+                => Task.FromResult<IReadOnlyList<MerchandisingRule>>(Array.Empty<MerchandisingRule>());
+
+            public Task<MerchandisingRule?> GetRuleByIdAsync(long ruleId) => Task.FromResult<MerchandisingRule?>(null);
+
+            public Task<MerchandisingRule> CreateRuleAsync(MerchandisingRuleCreateRequest request, long userId)
+                => throw new NotSupportedException();
+
+            public Task<MerchandisingRule> UpdateRuleAsync(long ruleId, MerchandisingRuleUpdateRequest request, long userId)
+                => throw new NotSupportedException();
+
+            public Task DeleteRuleAsync(long ruleId) => Task.CompletedTask;
+
+            public Task<Dictionary<long, decimal>> EvaluateRulesAsync(IEnumerable<RuleEvaluationInput> products, DateTimeOffset? evaluationTimeUtc = null)
+                => Task.FromResult(new Dictionary<long, decimal>());
+
+            public Task InvalidateCacheAsync() => Task.CompletedTask;
         }
     }
 }

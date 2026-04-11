@@ -1,10 +1,13 @@
 #nullable enable
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TrendplusProdavnica.Api.Infrastructure.Auth;
 using TrendplusProdavnica.Application.Admin.Dtos;
 using TrendplusProdavnica.Application.Admin.Services;
 
 namespace TrendplusProdavnica.Api.Controllers.Admin
 {
+    [Authorize(Policy = ApiAuthorizationPolicies.Admin)]
     [ApiController]
     [Route("api/admin/product-media")]
     public class ProductMediaAdminController : ControllerBase

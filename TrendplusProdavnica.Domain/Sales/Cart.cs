@@ -18,6 +18,16 @@ namespace TrendplusProdavnica.Domain.Sales
         public string CartToken { get; set; } = string.Empty;
 
         /// <summary>
+        /// Optional user identifier for authenticated carts.
+        /// </summary>
+        public string? UserId { get; set; }
+
+        /// <summary>
+        /// Session identifier used to fetch cart in stateless API requests.
+        /// </summary>
+        public string? SessionId { get; set; }
+
+        /// <summary>
         /// Current status of the cart (Active, Abandoned, Converted)
         /// </summary>
         public CartStatus Status { get; set; } = CartStatus.Active;
