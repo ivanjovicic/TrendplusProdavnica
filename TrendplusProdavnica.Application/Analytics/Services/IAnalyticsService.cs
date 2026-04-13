@@ -65,5 +65,16 @@ namespace TrendplusProdavnica.Application.Analytics.Services
             DateTime? from = null,
             DateTime? to = null,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Vraća supplier/brand sales statistiku (točne, imutetne podatke)
+        /// Koristi readonly snapshot za analitiku - nikakve izmene
+        /// </summary>
+        Task<SupplierSalesReportDto> GetSupplierSalesStatsAsync(
+            long? brandId = null,
+            DateTime? from = null,
+            DateTime? to = null,
+            int limit = 100,
+            CancellationToken cancellationToken = default);
     }
 }

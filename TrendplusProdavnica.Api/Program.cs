@@ -16,6 +16,7 @@ using TrendplusProdavnica.Application.Stores.Queries;
 using TrendplusProdavnica.Application.Stores.Services;
 using TrendplusProdavnica.Application.Search.Queries;
 using TrendplusProdavnica.Application.Search.Services;
+using TrendplusProdavnica.Application.Analytics.Services;
 using TrendplusProdavnica.Application.Checkout.Dtos;
 using TrendplusProdavnica.Application.Checkout.Services;
 using TrendplusProdavnica.Application.Wishlist.Dtos;
@@ -1527,6 +1528,55 @@ async Task<IResult> ClearCartEndpoint(
     catch (KeyNotFoundException ex)
     {
         return Results.NotFound(new { error = "Not found", message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
+// ============================================================
+// ANALYTICS ENDPOINTS
+// ============================================================
+
+app.MapGet("/api/analytics/supplier-sales-stats", SupplierSalesStatsEndpoint)
+    .WithName("GetSupplierSalesStats")
+    .WithSummary("Get supplier sales statistics")
+    .WithDescription("Returns supplier sales statistics with revenue, orders, and conversion metrics. Data is immutable snapshot.")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status400BadRequest)
+    .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+async Task<IResult> SupplierSalesStatsEndpoint(
+    IAnalyticsService analyticsService,
+    long? brandId = null,
+    DateTime? from = null,
+    DateTime? to = null,
+    int limit = 100)
+{
+    try
+    {
+        // Validate parameters
+        if (limit <= 0 || limit > 500)
+            return Results.BadRequest(new { error = "Invalid limit", message = "Limit must be between 1 and 500" });
+
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+            return Results.BadRequest(new { error = "Invalid date range", message = "From date must be before To date" });
+
+        if (brandId.HasValue && brandId.Value <= 0)
+            return Results.BadRequest(new { error = "Invalid brandId", message = "BrandId must be greater than 0" });
+
+        var report = await analyticsService.GetSupplierSalesStatsAsync(
+            brandId: brandId,
+            from: from,
+            to: to,
+            limit: limit);
+
+        return Results.Ok(report);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = "Invalid request", message = ex.Message });
     }
     catch (Exception ex)
     {

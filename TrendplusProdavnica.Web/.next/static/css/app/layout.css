@@ -1,0 +1,156 @@
+/*!*****************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[10].use[3]!./src/app/globals.css ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Styles */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  @apply font-sans text-gray-900 bg-white;
+  font-feature-settings: "kern" 1;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  @apply text-gray-900 leading-tight;
+}
+
+h1 {
+  @apply text-4xl md:text-5xl lg:text-6xl font-light;
+}
+
+h2 {
+  @apply text-3xl md:text-4xl font-light;
+}
+
+h3 {
+  @apply text-xl md:text-2xl font-light;
+}
+
+p {
+  @apply text-base text-gray-600 leading-relaxed;
+}
+
+/* Links */
+a {
+  @apply transition-colors duration-200;
+}
+
+a:hover {
+  @apply text-gray-700;
+}
+
+/* Buttons & Inputs */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  @apply outline-none ring-0;
+}
+
+button {
+  @apply cursor-pointer transition-colors duration-200;
+}
+
+input,
+select,
+textarea {
+  @apply transition-colors duration-200;
+}
+
+/* Images */
+img {
+  @apply max-w-full h-auto;
+}
+
+/* Selection */
+::selection {
+  @apply bg-gray-900 text-white;
+}
+
+::-moz-selection {
+  @apply bg-gray-900 text-white;
+}
+
+/* Premium Utilities */
+.glass-effect {
+  @apply bg-white/95 backdrop-blur-sm;
+}
+
+.premium-text {
+  @apply text-gray-900 font-light tracking-tight;
+}
+
+.premium-heading {
+  @apply text-gray-900 font-light leading-tight;
+  letter-spacing: -0.02em;
+}
+
+/* Smooth hover effects */
+.link-hover {
+  @apply relative inline-block;
+}
+
+.link-hover::after {
+  content: '';
+  @apply absolute bottom-0 left-0 w-0 h-0.5 bg-gray-900 transition-all duration-300;
+}
+
+.link-hover:hover::after {
+  @apply w-full;
+}
+
+/* Premium spacing helpers */
+.container-tight {
+  @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.container-wide {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.section-spacing {
+  @apply py-12 md:py-16 lg:py-24;
+}
+
+.section-spacing-lg {
+  @apply py-16 md:py-24 lg:py-32;
+}
+
+/* Grid utilities */
+.grid-responsive-2-3 {
+  @apply grid grid-cols-2 md:grid-cols-3 gap-6;
+}
+
+.grid-responsive-2-3-4 {
+  @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    @apply !transition-none !duration-0;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    @apply bg-white;
+  }
+
+  a {
+    @apply no-underline;
+  }
+}
+
+

@@ -83,4 +83,55 @@ namespace TrendplusProdavnica.Application.Analytics.DTOs
         public int TotalEvents { get; set; }
         public DateTime GeneratedAtUtc { get; set; }
     }
+
+    /// <summary>
+    /// Metrika: Supplier sales statistics - točni imutetni podaci
+    /// </summary>
+    public class SupplierSalesStatsDto
+    {
+        public long? BrandId { get; set; }
+        public string? BrandName { get; set; }
+        
+        // Order-related metrics
+        public int TotalOrders { get; set; }
+        public int CompletedOrders { get; set; }
+        public int PendingOrders { get; set; }
+        
+        // Revenue metrics
+        public decimal TotalRevenue { get; set; }
+        public decimal AverageOrderValue { get; set; }
+        
+        // Product metrics
+        public int TotalProductsListed { get; set; }
+        public int UnitsOrdered { get; set; }
+        public decimal AverageUnitsPerOrder { get; set; }
+        
+        // Performance indicators
+        public decimal ConversionRate { get; set; }  // percentage
+        public int ProductViews { get; set; }
+        
+        // Temporal info
+        public DateTime PeriodStart { get; set; }
+        public DateTime PeriodEnd { get; set; }
+        
+        // Data integrity markers
+        public DateTime CalculatedAtUtc { get; set; }
+        public string DataVersion { get; set; } = "1.0";
+        public bool IsAggregated { get; set; }
+        public int SourceRecordCount { get; set; }  // Broj izvora koji je korišten
+    }
+
+    /// <summary>
+    /// Aggregated supplier sales response
+    /// </summary>
+    public class SupplierSalesReportDto
+    {
+        public List<SupplierSalesStatsDto> Suppliers { get; set; } = new();
+        public DateTime ReportGeneratedAtUtc { get; set; }
+        public DateTime PeriodStart { get; set; }
+        public DateTime PeriodEnd { get; set; }
+        public int TotalSuppliersIncluded { get; set; }
+        public decimal TotalMarketRevenue { get; set; }
+        public int TotalMarketOrders { get; set; }
+    }
 }
