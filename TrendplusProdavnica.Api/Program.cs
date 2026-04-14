@@ -1584,6 +1584,53 @@ async Task<IResult> SupplierSalesStatsEndpoint(
     }
 }
 
+app.MapGet("/api/analytics/shoe-type-sales-stats", ShoeTypeSalesStatsEndpoint)
+    .WithName("GetShoeTypeSalesStats")
+    .WithSummary("Get shoe-type (category) sales statistics")
+    .WithDescription("Returns shoe-type sales statistics with revenue, orders, and conversion metrics aggregated from immutable snapshots.")
+    .Produces(StatusCodes.Status200OK)
+    .ProducesProblem(StatusCodes.Status400BadRequest)
+    .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+async Task<IResult> ShoeTypeSalesStatsEndpoint(
+    IAnalyticsService analyticsService,
+    long? categoryId = null,
+    DateTime? from = null,
+    DateTime? to = null,
+    int limit = 100,
+    bool includeSubcategories = true)
+{
+    try
+    {
+        // Validate parameters
+        if (limit <= 0 || limit > 500)
+            return Results.BadRequest(new { error = "Invalid limit", message = "Limit must be between 1 and 500" });
+
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+            return Results.BadRequest(new { error = "Invalid date range", message = "From date must be before To date" });
+
+        if (categoryId.HasValue && categoryId.Value <= 0)
+            return Results.BadRequest(new { error = "Invalid categoryId", message = "CategoryId must be greater than 0" });
+
+        var report = await analyticsService.GetShoeTypeSalesStatsAsync(
+            categoryId: categoryId,
+            from: from,
+            to: to,
+            limit: limit,
+            includeSubcategories: includeSubcategories);
+
+        return Results.Ok(report);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = "Invalid request", message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+    }
+}
+
 // ============================================================
 // CHECKOUT ENDPOINTS
 // ============================================================

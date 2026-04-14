@@ -236,6 +236,8 @@ public class CheckoutService : ICheckoutService
                     ProductNameSnapshot = item.Variant.Product!.Name,
                     BrandNameSnapshot = item.Variant.Product.Brand?.Name ?? string.Empty,
                     SizeEuSnapshot = item.Variant.SizeEu,
+                    CategoryIdSnapshot = item.Variant.Product.PrimaryCategoryId,
+                    CategoryNameSnapshot = item.Variant.Product.PrimaryCategoryId > 0 ? "Default" : string.Empty,
                     UnitPrice = item.UnitPrice,
                     Quantity = item.CartItem.Quantity,
                     LineTotal = item.UnitPrice * item.CartItem.Quantity

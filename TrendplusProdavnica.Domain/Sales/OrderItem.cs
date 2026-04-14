@@ -15,6 +15,10 @@ public class OrderItem
     public string ProductNameSnapshot { get; set; } = null!;
     public string BrandNameSnapshot { get; set; } = null!;
     public decimal SizeEuSnapshot { get; set; }
+    
+    // Snapshot of category at time of purchase (for immutable analytics)
+    public long? CategoryIdSnapshot { get; set; }
+    public string? CategoryNameSnapshot { get; set; }
 
     public decimal UnitPrice { get; set; }
     public int Quantity { get; set; }

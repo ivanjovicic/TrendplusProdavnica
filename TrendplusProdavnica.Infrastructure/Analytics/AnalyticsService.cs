@@ -320,12 +320,18 @@ namespace TrendplusProdavnica.Infrastructure.Analytics
                 var endDate = to ?? DateTime.UtcNow;
                 var generatedAt = DateTime.UtcNow;
 
+                var startFilter = new DateTimeOffset(startDate).UtcDateTime;
+                var endFilter = new DateTimeOffset(endDate).UtcDateTime;
+
+                // Debug log actual filters used
+                _logger.LogInformation("Generating supplier sales stats for period {Start} to {End}", startFilter, endFilter);
+
                 // Get all orders in period (readonly snapshot)
                 var orders = await _db.Orders
                     .AsNoTracking()
                     .Where(o =>
-                        o.CreatedAtUtc >= startDate &&
-                        o.CreatedAtUtc <= endDate &&
+                        o.CreatedAtUtc >= new DateTimeOffset(startFilter, TimeSpan.Zero) &&
+                        o.CreatedAtUtc <= new DateTimeOffset(endFilter, TimeSpan.Zero) &&
                         (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Completed))
                     .Include(o => o.Items)
                     .ToListAsync(cancellationToken);
@@ -482,6 +488,185 @@ namespace TrendplusProdavnica.Infrastructure.Analytics
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating supplier sales stats");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Aggregates sales statistics by shoe-type (category) using read-only snapshots where available
+        /// </summary>
+        public async Task<ShoeTypeSalesReportDto> GetShoeTypeSalesStatsAsync(
+            long? categoryId = null,
+            DateTime? from = null,
+            DateTime? to = null,
+            int limit = 100,
+            bool includeSubcategories = true,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var startDate = from ?? DateTime.UtcNow.AddDays(-30);
+                var endDate = to ?? DateTime.UtcNow;
+                var generatedAt = DateTime.UtcNow;
+
+                var startFilter = new DateTimeOffset(startDate).UtcDateTime;
+                var endFilter = new DateTimeOffset(endDate).UtcDateTime;
+
+                _logger.LogInformation("Generating shoe-type sales stats for period {Start} to {End}", startFilter, endFilter);
+
+                var orders = await _db.Orders
+                    .AsNoTracking()
+                    .Where(o =>
+                        o.CreatedAtUtc >= new DateTimeOffset(startFilter, TimeSpan.Zero) &&
+                        o.CreatedAtUtc <= new DateTimeOffset(endFilter, TimeSpan.Zero) &&
+                        (o.Status == OrderStatus.Pending || o.Status == OrderStatus.Completed))
+                    .Include(o => o.Items)
+                    .ToListAsync(cancellationToken);
+
+                var productIds = orders
+                    .SelectMany(o => o.Items.Select(i => i.ProductId))
+                    .Distinct()
+                    .ToList();
+
+                var productCategoryMap = await _db.Products
+                    .AsNoTracking()
+                    .Where(p => productIds.Contains(p.Id))
+                    .Select(p => new { p.Id, p.PrimaryCategoryId })
+                    .ToListAsync(cancellationToken);
+
+                var productViews = await _db.AnalyticsEvents
+                    .AsNoTracking()
+                    .Where(e =>
+                        e.EventType == AnalyticsEventType.ProductView &&
+                        e.EventTimestamp >= startDate &&
+                        e.EventTimestamp <= endDate)
+                    .ToListAsync(cancellationToken);
+
+                var stats = new Dictionary<long, ShoeTypeSalesStatsDto>();
+                var ordersProcessedByCategory = new Dictionary<(long orderId, long categoryId), bool>();
+
+                foreach (var order in orders)
+                {
+                    var orderCategories = new HashSet<long>();
+
+                    foreach (var item in order.Items)
+                    {
+                        long catId = 0;
+                        string catName = "Unknown";
+
+                        if (item.CategoryIdSnapshot.HasValue && item.CategoryIdSnapshot.Value > 0)
+                        {
+                            catId = item.CategoryIdSnapshot.Value;
+                            catName = item.CategoryNameSnapshot ?? "Unknown";
+                        }
+                        else
+                        {
+                            var prod = productCategoryMap.FirstOrDefault(p => p.Id == item.ProductId);
+                            if (prod != null)
+                            {
+                                catId = prod.PrimaryCategoryId;
+                            }
+                        }
+
+                        if (!stats.ContainsKey(catId))
+                        {
+                            stats[catId] = new ShoeTypeSalesStatsDto
+                            {
+                                CategoryId = catId == 0 ? null : (long?)catId,
+                                CategoryName = catName,
+                                CalculatedAtUtc = generatedAt,
+                                PeriodStart = startDate,
+                                PeriodEnd = endDate
+                            };
+                        }
+
+                        var stat = stats[catId];
+                        stat.UnitsOrdered += item.Quantity;
+                        stat.TotalRevenue += item.LineTotal;
+                        stat.SourceRecordCount++;
+
+                        orderCategories.Add(catId);
+                    }
+
+                    foreach (var cid in orderCategories)
+                    {
+                        if (!ordersProcessedByCategory.ContainsKey((order.Id, cid)))
+                        {
+                            var stat = stats[cid];
+                            stat.TotalOrders++;
+                            if (order.Status == OrderStatus.Completed)
+                                stat.CompletedOrders++;
+                            else if (order.Status == OrderStatus.Pending)
+                                stat.PendingOrders++;
+
+                            ordersProcessedByCategory[(order.Id, cid)] = true;
+                        }
+                    }
+                }
+
+                var viewsByCategory = new Dictionary<long, int>();
+                foreach (var v in productViews)
+                {
+                    if (v.ProductId.HasValue)
+                    {
+                        var prod = productCategoryMap.FirstOrDefault(p => p.Id == v.ProductId.Value);
+                        var cid = prod != null ? prod.PrimaryCategoryId : 0;
+                        if (!viewsByCategory.ContainsKey(cid)) viewsByCategory[cid] = 0;
+                        viewsByCategory[cid]++;
+                    }
+                }
+
+                foreach (var kvp in viewsByCategory)
+                {
+                    if (stats.ContainsKey(kvp.Key))
+                    {
+                        stats[kvp.Key].ProductViews = kvp.Value;
+                    }
+                }
+
+                var reportList = new List<ShoeTypeSalesStatsDto>();
+                foreach (var s in stats.Values)
+                {
+                    if (s.TotalOrders > 0)
+                    {
+                        s.AverageOrderValue = s.TotalRevenue / s.TotalOrders;
+                        s.AverageUnitsPerOrder = (decimal)s.UnitsOrdered / s.TotalOrders;
+                    }
+
+                    if (s.ProductViews > 0)
+                        s.ConversionRate = (s.TotalOrders * 100m) / s.ProductViews;
+
+                    s.IsAggregated = true;
+                    reportList.Add(s);
+                }
+
+                if (categoryId.HasValue)
+                {
+                    reportList = reportList.Where(s => s.CategoryId == categoryId).ToList();
+                }
+
+                var report = new ShoeTypeSalesReportDto
+                {
+                    ShoeTypes = reportList.OrderByDescending(s => s.TotalRevenue).Take(limit).ToList(),
+                    ReportGeneratedAtUtc = generatedAt,
+                    PeriodStart = startDate,
+                    PeriodEnd = endDate,
+                    TotalTypesIncluded = reportList.Count,
+                    TotalMarketRevenue = reportList.Sum(s => s.TotalRevenue),
+                    TotalMarketOrders = reportList.Sum(s => s.TotalOrders)
+                };
+
+                _logger.LogInformation(
+                    "Generated shoe-type stats for {Count} types from {Start} to {End}",
+                    report.TotalTypesIncluded,
+                    startDate,
+                    endDate);
+
+                return report;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating shoe-type stats");
                 throw;
             }
         }

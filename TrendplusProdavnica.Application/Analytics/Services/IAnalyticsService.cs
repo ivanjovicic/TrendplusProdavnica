@@ -76,5 +76,16 @@ namespace TrendplusProdavnica.Application.Analytics.Services
             DateTime? to = null,
             int limit = 100,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Aggregated shoe-type / category sales statistics (read-only snapshot)
+        /// </summary>
+        Task<ShoeTypeSalesReportDto> GetShoeTypeSalesStatsAsync(
+            long? categoryId = null,
+            DateTime? from = null,
+            DateTime? to = null,
+            int limit = 100,
+            bool includeSubcategories = true,
+            CancellationToken cancellationToken = default);
     }
 }

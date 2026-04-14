@@ -476,5 +476,167 @@ namespace TrendplusProdavnica.Tests
             Assert.True(report.PeriodEnd != default);
             Assert.True(report.PeriodStart <= report.PeriodEnd);
         }
+
+        [Fact]
+        public async Task GetSupplierSalesStatsAsync_BoundaryDates_EdgeCasesCorrectlyIncluded()
+        {
+            const string dbName = "Analytics_BoundaryDates";
+            using var provider = CreateServiceProvider(dbName);
+            using var scope = provider.CreateScope();
+
+            var db = scope.ServiceProvider.GetRequiredService<TrendplusDbContext>();
+            var analyticsService = scope.ServiceProvider.GetRequiredService<IAnalyticsService>();
+
+            var now = DateTimeOffset.UtcNow;
+            var edgeDateStart = now.AddDays(-10).DateTime;
+            var edgeDateEnd = now.AddDays(-5).DateTime;
+
+            // Using pure DateTime for In-Memory test consistency with AnalyticsService logic
+            var date1 = new DateTime(edgeDateStart.Ticks, DateTimeKind.Utc);
+            var date2 = new DateTime(edgeDateEnd.Ticks, DateTimeKind.Utc);
+            var date3 = new DateTime(edgeDateEnd.AddSeconds(1).Ticks, DateTimeKind.Utc);
+
+            // Seed orders
+            var order1 = new Order
+            {
+                OrderNumber = "ORD-EDGE-1",
+                Status = OrderStatus.Completed,
+                CreatedAtUtc = date1,
+                PlacedAtUtc = date1,
+                TotalAmount = 100m,
+                Currency = "RSD",
+                DeliveryMethod = Domain.Sales.DeliveryMethod.Courier,
+                PaymentMethod = Domain.Sales.PaymentMethod.CashOnDelivery,
+                CustomerFirstName = "John",
+                CustomerLastName = "Doe",
+                Email = "john@example.com",
+                Phone = "+123456789",
+                DeliveryAddressLine1 = "123 Main St",
+                DeliveryCity = "New York",
+                DeliveryPostalCode = "10001"
+            };
+            var order2 = new Order
+            {
+                OrderNumber = "ORD-EDGE-2",
+                Status = OrderStatus.Completed,
+                CreatedAtUtc = date2,
+                PlacedAtUtc = date2,
+                TotalAmount = 100m,
+                Currency = "RSD",
+                DeliveryMethod = Domain.Sales.DeliveryMethod.Courier,
+                PaymentMethod = Domain.Sales.PaymentMethod.CashOnDelivery,
+                CustomerFirstName = "John",
+                CustomerLastName = "Doe",
+                Email = "john@example.com",
+                Phone = "+123456789",
+                DeliveryAddressLine1 = "123 Main St",
+                DeliveryCity = "New York",
+                DeliveryPostalCode = "10001"
+            };
+            var order3 = new Order
+            {
+                OrderNumber = "ORD-EDGE-3",
+                Status = OrderStatus.Completed,
+                CreatedAtUtc = date3,
+                PlacedAtUtc = date3,
+                TotalAmount = 100m,
+                Currency = "RSD",
+                DeliveryMethod = Domain.Sales.DeliveryMethod.Courier,
+                PaymentMethod = Domain.Sales.PaymentMethod.CashOnDelivery,
+                CustomerFirstName = "John",
+                CustomerLastName = "Doe",
+                Email = "john@example.com",
+                Phone = "+123456789",
+                DeliveryAddressLine1 = "123 Main St",
+                DeliveryCity = "New York",
+                DeliveryPostalCode = "10001"
+            };
+
+            var brand = new Brand { Name = "BrandEdge", Slug = "brandedge" };
+            db.Brands.Add(brand);
+            await db.SaveChangesAsync();
+
+            var product = new Product { Name = "EdgeProduct", BrandId = brand.Id, Slug = "edge-p" };
+            db.Products.Add(product);
+            await db.SaveChangesAsync();
+
+            foreach (var o in new[] { order1, order2, order3 })
+            {
+                o.Items.Add(new OrderItem 
+                { 
+                    ProductId = product.Id, 
+                    ProductNameSnapshot = "EdgeProduct", 
+                    BrandNameSnapshot = "BrandEdge",
+                    Quantity = 1, 
+                    UnitPrice = 100m,
+                    LineTotal = 100m 
+                });
+                db.Orders.Add(o);
+            }
+            await db.SaveChangesAsync();
+
+            // Act: Filter to exactly date1 to date2
+            var report = await analyticsService.GetSupplierSalesStatsAsync(from: date1, to: date2);
+
+            // Assert: Should have 2 orders (date1 and date2)
+            var supplier = report.Suppliers.FirstOrDefault(s => s.BrandId == brand.Id);
+            Assert.NotNull(supplier);
+            Assert.Equal(2, supplier.TotalOrders);
+        }
+
+        [Fact]
+        public async Task GetSupplierSalesStatsAsync_DeterministicSorting_ReturnsConsistentOrder()
+        {
+            const string dbName = "Analytics_Sorting";
+            using var provider = CreateServiceProvider(dbName);
+            using var scope = provider.CreateScope();
+
+            var db = scope.ServiceProvider.GetRequiredService<TrendplusDbContext>();
+            var analyticsService = scope.ServiceProvider.GetRequiredService<IAnalyticsService>();
+
+            // Seed multiple suppliers with varying revenues
+            for (int i = 0; i < 5; i++)
+            {
+                var revenueMultiplier = 5 - i; // Higher revenue for lower index
+                await SeedSupplierWithOrdersAsync(db, $"Brand-{i}", 1, revenueMultiplier);
+            }
+
+            // Act: Call twice and compare order
+            var report1 = await analyticsService.GetSupplierSalesStatsAsync();
+            var report2 = await analyticsService.GetSupplierSalesStatsAsync();
+
+            // Assert: Order of IDs must be identical
+            var ids1 = report1.Suppliers.Select(s => s.BrandId).ToList();
+            var ids2 = report2.Suppliers.Select(s => s.BrandId).ToList();
+            
+            Assert.Equal(ids1, ids2);
+            // Verify it's sorted by revenue descending (highest first)
+            Assert.Equal(ids1.First(), report1.Suppliers.OrderByDescending(s => s.TotalRevenue).First().BrandId);
+        }
+
+        [Fact]
+        public async Task GetSupplierSalesStatsAsync_Concurrency_IsThreadSafe()
+        {
+            const string dbName = "Analytics_Concurrency";
+            using var provider = CreateServiceProvider(dbName);
+            using var scope = provider.CreateScope();
+
+            var db = scope.ServiceProvider.GetRequiredService<TrendplusDbContext>();
+            var analyticsService = scope.ServiceProvider.GetRequiredService<IAnalyticsService>();
+
+            await SeedSupplierWithOrdersAsync(db, "ConcurrentBrand", 2, 5);
+
+            // Act: Run multiple parallel tasks
+            var tasks = Enumerable.Range(0, 10).Select(_ => analyticsService.GetSupplierSalesStatsAsync());
+            var results = await Task.WhenAll(tasks);
+
+            // Assert: All results should be identical and not crash
+            var firstResultRevenue = results[0].TotalMarketRevenue;
+            foreach (var result in results)
+            {
+                Assert.Equal(firstResultRevenue, result.TotalMarketRevenue);
+                Assert.Equal(results[0].Suppliers.Count, result.Suppliers.Count);
+            }
+        }
     }
 }
