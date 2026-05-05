@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { analyticsApi, ShoeTypeSalesReport, ShoeTypeSalesStats } from "@/lib/api/analytics";
+import { analyticsApi, ShoeTypeSalesReport } from "@/lib/api/analytics";
 import { formatCurrency } from "@/lib/utils/format";
 
 export default function ShoeTypeAnalyticsPage() {

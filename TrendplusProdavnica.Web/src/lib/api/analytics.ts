@@ -71,8 +71,8 @@ export interface AnalyticsQueryParams {
 
 export const analyticsApi = {
   getShoeTypeSalesStats: (params?: AnalyticsQueryParams) =>
-    getApiClient().get<ShoeTypeSalesReport>('/analytics/shoe-type-sales-stats', { searchParams: params }),
+    getApiClient.get<ShoeTypeSalesReport>('/analytics/shoe-type-sales-stats', { searchParams: params }),
 
   getSupplierSalesStats: (params?: AnalyticsQueryParams) =>
-    getApiClient().get<SupplierSalesReport>('/analytics/supplier-sales-stats', { searchParams: params }),
+    getApiClient.get<SupplierSalesReport>('/analytics/supplier-sales-stats', { searchParams: params }),
 };

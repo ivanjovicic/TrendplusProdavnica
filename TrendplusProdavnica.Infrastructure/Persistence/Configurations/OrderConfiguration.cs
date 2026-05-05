@@ -72,12 +72,12 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
 
             builder.HasIndex(x => x.CartId)
                 .IsUnique()
-                .HasFilter("\"cart_id\" IS NOT NULL")
+                .HasFilter("\"CartId\" IS NOT NULL")
                 .HasDatabaseName("ux_orders_cart_id");
 
             builder.HasIndex(x => x.CheckoutIdempotencyKey)
                 .IsUnique()
-                .HasFilter("\"checkout_idempotency_key\" IS NOT NULL")
+                .HasFilter("\"CheckoutIdempotencyKey\" IS NOT NULL")
                 .HasDatabaseName("ux_orders_checkout_idempotency_key");
 
             builder.HasMany(x => x.Items)

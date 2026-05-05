@@ -42,6 +42,11 @@ const SIDEBAR_ITEMS = [
     href: "/admin/homepage",
     icon: "🏠",
   },
+  {
+    label: "Dobavljači",
+    href: "/admin/analytics/supplier",
+    icon: "📈",
+  },
 ];
 
 function AdminShell({
@@ -122,11 +127,13 @@ function AdminShell({
         {/* Top bar */}
         <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
           <h2 className="text-xl font-light text-slate-900">
-            {SIDEBAR_ITEMS.find(
-              (item) =>
-                item.href === pathname ||
-                pathname.startsWith(item.href + "/")
-            )?.label || "Admin"}
+            {[...SIDEBAR_ITEMS]
+              .sort((a, b) => b.href.length - a.href.length)
+              .find(
+                (item) =>
+                  item.href === pathname ||
+                  pathname.startsWith(item.href + "/")
+              )?.label || "Admin"}
           </h2>
           <div className="text-sm text-slate-600">
             {new Date().toLocaleDateString()}

@@ -140,9 +140,8 @@ public sealed class CheckoutServiceTests
     }
 
     [Fact]
-    public async Task PlaceOrder_CartAlreadyConverted_ReturnsMappedExistingOrder()
+    public async Task PlaceOrder_CartAlreadyConverted_WithDifferentIdempotencyKey_ReturnsInvalidCart()
     {
-        // If cart is already Converted, should return existing order
         await using var database = CheckoutTestDatabase.Create();
         await database.SeedCartAsync(cartToken: "cart-converted", stock: 5, quantity: 1);
 
@@ -158,13 +157,12 @@ public sealed class CheckoutServiceTests
         var cart = await verifyContext.Carts.FirstAsync(c => c.CartToken == "cart-converted");
         Assert.Equal(CartStatus.Converted, cart.Status);
 
-        // Second checkout with different idempotency key
         var request2 = CheckoutTestDatabase.CreateRequest("cart-converted", "idem-converted-2");
         await using var secondContext = database.CreateContext();
         var secondResult = await new CheckoutService(secondContext).PlaceOrderAsync(request2);
-        
-        // Should fail because cart is converted, returning InvalidCart
+
         Assert.Equal(CheckoutOutcome.InvalidCart, secondResult.Outcome);
+        Assert.True(string.IsNullOrEmpty(secondResult.OrderNumber));
     }
 
     private sealed class CheckoutTestDatabase : IAsyncDisposable

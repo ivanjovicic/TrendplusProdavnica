@@ -12,8 +12,8 @@ namespace TrendplusProdavnica.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("cart_items", "sales", t =>
             {
-                t.HasCheckConstraint("ck_cart_items_quantity", "quantity > 0");
-                t.HasCheckConstraint("ck_cart_items_unit_price", "unit_price > 0");
+                t.HasCheckConstraint("ck_cart_items_quantity", "\"Quantity\" > 0");
+                t.HasCheckConstraint("ck_cart_items_unit_price", "\"UnitPrice\" > 0");
             });
 
             builder.HasKey(x => x.Id);

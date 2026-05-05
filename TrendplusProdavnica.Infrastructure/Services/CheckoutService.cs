@@ -124,9 +124,8 @@ public class CheckoutService : ICheckoutService
         var normalizedIdempotencyKey = NormalizeIdempotencyKey(request);
 
         // Check if already processed (idempotent key)
-        var existingOrder = await FindExistingProcessedOrderAsync(
+        var existingOrder = await FindProcessedOrderByIdempotencyKeyAsync(
             normalizedIdempotencyKey,
-            request.CartToken,
             cancellationToken);
 
         if (existingOrder != null)
@@ -148,12 +147,18 @@ public class CheckoutService : ICheckoutService
 
             if (cart.Status == CartStatus.Converted)
             {
-                var convertedOrder = await FindOrderByCartIdAsync(cart.Id, cancellationToken);
-                return convertedOrder != null
-                    ? CreateAlreadyProcessedResult(convertedOrder)
-                    : CreateFailureResult(
-                        CheckoutOutcome.InvalidCart,
-                        "Korpa je već konvertovana i više nije dostupna za checkout.");
+                var replayOrder = await FindProcessedOrderByIdempotencyKeyAsync(
+                    normalizedIdempotencyKey,
+                    cancellationToken);
+
+                if (replayOrder != null)
+                {
+                    return CreateAlreadyProcessedResult(replayOrder);
+                }
+
+                return CreateFailureResult(
+                    CheckoutOutcome.InvalidCart,
+                    "Korpa je već konvertovana i više nije dostupna za checkout.");
             }
 
             if (cart.Items.Count == 0)
@@ -271,14 +276,24 @@ public class CheckoutService : ICheckoutService
             _context.ChangeTracker.Clear();
 
             // Check if order was already created (idempotency)
-            var processedOrder = await FindExistingProcessedOrderAsync(
-                NormalizeIdempotencyKey(request),
-                request.CartToken,
+            var processedOrder = await FindProcessedOrderByIdempotencyKeyAsync(
+                normalizedIdempotencyKey,
                 cancellationToken);
 
             if (processedOrder != null)
             {
                 return CreateAlreadyProcessedResult(processedOrder);
+            }
+
+            var conflictingOrder = await FindProcessedOrderByCartTokenAsync(
+                request.CartToken,
+                cancellationToken);
+
+            if (conflictingOrder != null)
+            {
+                return CreateFailureResult(
+                    CheckoutOutcome.InvalidCart,
+                    "Korpa je već obrađena drugim checkout zahtevom.");
             }
 
             // If this is a concurrentcy exception and we haven't retried too much, could retry once
@@ -402,22 +417,21 @@ public class CheckoutService : ICheckoutService
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<Order?> FindExistingProcessedOrderAsync(
+    private Task<Order?> FindProcessedOrderByIdempotencyKeyAsync(
         string normalizedIdempotencyKey,
-        string cartToken,
         CancellationToken cancellationToken)
     {
-        var order = await _context.Orders
+        return _context.Orders
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 entity => entity.CheckoutIdempotencyKey == normalizedIdempotencyKey,
                 cancellationToken);
+    }
 
-        if (order != null)
-        {
-            return order;
-        }
-
+    private async Task<Order?> FindProcessedOrderByCartTokenAsync(
+        string cartToken,
+        CancellationToken cancellationToken)
+    {
         var cartId = await _context.Carts
             .AsNoTracking()
             .Where(entity => entity.CartToken == cartToken)
